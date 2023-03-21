@@ -10,6 +10,7 @@ from torch.autograd import Variable
 import torch.utils.data as Data
 from collections import OrderedDict
 import time
+import matplotlib.pyplot as plt
 from config import args
 import os
 # Define GRU Neural Networks
@@ -59,7 +60,7 @@ class GRU(nn.Module):
         return out
 class Model():
     def __init__(self,device = torch.device("cpu")):
-        self.epochs       = 200
+        self.epochs       = 2
         self.batch_size   = 128
         self.batches      = 30
         self.lr           = 0.5
@@ -136,30 +137,35 @@ class Model():
                     loss_.backward()
                     self.optimizer.step()
                     # 统计部分$$$$$$$$$$
-                    train_l_sum += loss_.cpu().item()
-                    sample.write("{}\n".format(  list(map(int,y_hat.cpu().tolist()[0:10] ) )    ))
-                    sample.write("{}\n\n".format(list (map(int,y.tolist()[0:10]         ))     ))
+                    y_hat = y_hat.detach().numpy()
+                    loss_ = loss_.detach().numpy()
+                    y     = y.detach().numpy()
+                    train_l_sum += loss_
+                    sample.write("{}\n".format(  list(map(int,y_hat[0:10] ) )    ))
+                    sample.write("{}\n\n".format(list (map(int,y[0:10]         ))     ))
                     sample.flush()
                     train_err = sum([abs(y_hat[index] - y[index]) / (y[index]) for index in range(len(y_hat)) if y[index] != 0])/len(y_hat)
                     train_err_sum += train_err
                     n += y.shape[0]
                     batch_count += 1
-                    pbar.set_description("epoch:{},err={:.2f}%".format(epoch,train_err * 100))
+                    pbar.set_description("epoch:{},err={:.2f}".format(epoch,train_err))
                     pbar.update(1)
                     #end
                 self.scheduler.step()
-                # test_err,test_loss = self.evaluate_accuracy(test_iter)#测试太慢了，暂时不进行测试
+                test_err,test_loss = self.evaluate_accuracy(test_iter)#测试太慢了，暂时不进行测试
                 #仍然是统计部分
-                print(f'epoch{epoch + 1}, train err{train_err_sum/batch_count :.2f}, test err{test_err:.2f},train_loss{train_l_sum / batch_count:.2f},test_loss{test_loss:.2f}\n')
+                epoch_info = f'epoch{epoch + 1}, train err:{train_err_sum/batch_count :.2f}, test err:{test_err:.2f},train_loss:{train_l_sum / batch_count:.2f},test_loss:{test_loss:.2f}\n'
+                print(epoch_info)
                 log['train_err'].append(train_err_sum/batch_count)
                 log['test_err'].append(test_err)
                 log['train_loss'].append(train_l_sum/batch_count)
                 log['test_loss'].append(test_loss)
                 f = open(os.path.join(self.save_log_path,"train.log"), 'a',encoding="utf-8")
-                f.write(f'epoch{epoch + 1}, train err{train_err_sum/batch_count :.2f}, test err{test_err:.2f},train_loss{train_l_sum / batch_count:.2f},test_loss{test_loss:.2f}\n')
+                f.write(epoch_info + "\n")
                 f.close()
 
             #训练结束后保存图像
+            self.paint(log)
             torch.save(self.network, 'model/GRU_net.pkl')
             model = torch.load('model/GRU_net.pkl') 
 
@@ -182,113 +188,29 @@ class Model():
                 test_err = sum([abs(y_hat[index] - y[index]) / (y[index]) for index in range(len(y_hat)) if y[index] != 0])/len(y_hat)
                 test_err_sum += test_err
                 batch_count += 1
-        return test_err_sum/batch_count, test_err_sum/batch_count
-        # return acc_sum / n
+        return test_err_sum/batch_count, test_loss_sum/batch_count
+    
+    def paint(self,log:OrderedDict):
+            fig1 = plt.figure(1)
+            fig2 = plt.figure(2)
+            ax1 = fig1.subplots() 
+            ax2 = fig2.subplots()
+            ax1.plot(log['train_err'], label="train_err")
+            ax1.plot(log['test_err'],label = "test_err")
+            ax2.plot(log['train_loss'], label="train_loss")
+            ax2.plot(log['test_loss'],label = "test_loss")
+            ax1.set_title("err")
+            ax2.set_title("loss")
+            ax1.legend()
+            ax2.legend()
+            # plt.show()
+            fig1.savefig(os.path.join(self.save_log_path,"fig1.png"))
+            fig2.savefig(os.path.join(self.save_log_path,"fig2.png"))
+
+
+
 if __name__ == '__main__':
     torch.backends.cudnn.enabled=False
     device = torch.device("cpu")
     process = Model()
     process.train()
-
-
-if 0:
-# checking if GPU is available
-    device = torch.device("cpu")
-
-    if (torch.cuda.is_available()):
-        device = torch.device("cuda:0")
-        print('Training on GPU.')
-    else:
-        print('No GPU available, training on CPU.')
-
-    # 数据读取&类型转换
-    data_x = np.array(pd.read_csv('Data_x.csv', header=None)).astype('float32')
-    data_y = np.array(pd.read_csv('Data_y.csv', header=None)).astype('float32')
-
-    # 数据集分割
-    data_len = len(data_x)
-    t = np.linspace(0, data_len, data_len + 1)
-
-    train_data_ratio = 0.8  # Choose 80% of the data for training
-    train_data_len = int(data_len * train_data_ratio)
-
-    train_x = data_x[5:train_data_len]
-    train_y = data_y[5:train_data_len]
-    t_for_training = t[5:train_data_len]
-
-    test_x = data_x[train_data_len:]
-    test_y = data_y[train_data_len:]
-    t_for_testing = t[train_data_len:]
-
-    # ----------------- train -------------------
-    INPUT_FEATURES_NUM = 5
-    OUTPUT_FEATURES_NUM = 1
-    train_x_tensor = train_x.reshape(-1, 1, INPUT_FEATURES_NUM)  # set batch size to 1
-    train_y_tensor = train_y.reshape(-1, 1, OUTPUT_FEATURES_NUM)  # set batch size to 1
-
-    # transfer data to pytorch tensor
-    train_x_tensor = torch.from_numpy(train_x_tensor)
-    train_y_tensor = torch.from_numpy(train_y_tensor)
-
-    gru_model = GRU(INPUT_FEATURES_NUM, 30, output_size=OUTPUT_FEATURES_NUM, num_layers=1)  # 30 hidden units
-    print('GRU model:', gru_model )
-    print('model.parameters:', gru_model .parameters)
-    print('train x tensor dimension:', Variable(train_x_tensor).size())
-
-    criterion = nn.MSELoss()
-    optimizer = torch.optim.Adam(gru_model .parameters(), lr=1e-2)
-
-    prev_loss = 1000
-    max_epochs = 2000
-
-    train_x_tensor = train_x_tensor.to(device)
-
-    for epoch in range(max_epochs):
-        output = gru_model(train_x_tensor).to(device)
-        loss = criterion(output, train_y_tensor)
-
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-        if loss < prev_loss:
-            torch.save(gru_model.state_dict(), 'lstm_model.pt')  # save model parameters to files
-            prev_loss = loss
-
-        if loss.item() < 1e-4:
-            print('Epoch [{}/{}], Loss: {:.5f}'.format(epoch + 1, max_epochs, loss.item()))
-            print("The loss value is reached")
-            break
-        elif (epoch + 1) % 100 == 0:
-            print('Epoch: [{}/{}], Loss:{:.5f}'.format(epoch + 1, max_epochs, loss.item()))
-
-    # prediction on training dataset
-    pred_y_for_train = gru_model(train_x_tensor).to(device)
-    pred_y_for_train = pred_y_for_train.view(-1, OUTPUT_FEATURES_NUM).data.numpy()
-
-    # ----------------- test -------------------
-    gru_model = gru_model .eval()  # switch to testing model
-
-    # prediction on test dataset
-    test_x_tensor = test_x.reshape(-1, 1,
-                                    INPUT_FEATURES_NUM)
-    test_x_tensor = torch.from_numpy(test_x_tensor)  # 变为tensor
-    test_x_tensor = test_x_tensor.to(device)
-
-    pred_y_for_test = gru_model(test_x_tensor).to(device)
-    pred_y_for_test = pred_y_for_test.view(-1, OUTPUT_FEATURES_NUM).data.numpy()
-
-    loss = criterion(torch.from_numpy(pred_y_for_test), torch.from_numpy(test_y))
-    print("test loss：", loss.item())
-
-    # ----------------- plot -------------------
-    plt.figure()
-    plt.plot(t_for_training, train_y, 'b', label='y_trn')
-    plt.plot(t_for_training, pred_y_for_train, 'y--', label='pre_trn')
-
-    plt.plot(t_for_testing, test_y, 'k', label='y_tst')
-    plt.plot(t_for_testing, pred_y_for_test, 'm--', label='pre_tst')
-
-    plt.xlabel('t')
-    plt.ylabel('Vce')
-    plt.show()
