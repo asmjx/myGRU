@@ -1,12 +1,12 @@
 import numpy as np 
 import random
 import torch
+import math
 from tqdm import tqdm 
 from torch import nn, optim
 from torch.autograd import Variable
 import torch.nn.functional as F
-from dataset import DataSet
-from DIModel import Encoder, ResBlock, TimeEncoder
+from data_phm import DataSet
 import pickle
 import torch.utils.data as Data
 import pandas as pd
@@ -108,22 +108,12 @@ class Model():
             # _select = ['Bearing1_2','Bearing2_2','Bearing3_2']
         else:
             raise ValueError('wrong select!')
-        data = dataset.get_value('data',condition={'bearing_name':_select})
-        rul = dataset.get_value('RUL',condition={'bearing_name':_select})
-        # 因为data: [number_bear,测试次数,seq长度,feature] -> 第一个为6，第二个测试次数不定，seq 为2560,feature 2
-        # 所以希望，能够将数据第一维展平,这样每一个 振动序列都对应着 一个RUL  [测试总次数n,seq,2]
-        # RUL也需要进行同样操作， 因此对于RUL也做扩展处理                   [测试总次数n:RUL]
-        rul_cp = np.zeros(0)
-        for index,bear_data in enumerate(data):
-            repeat_data = rul[index]           # 对于每一个轴承的RUL是固定的
-            repeat_cnt  = bear_data.shape[0]   # 对于每一个轴承的一共测试了多少组
-            rul_cp = np.append(rul_cp,np.repeat(repeat_data,repeat_cnt))
-        data = np.concatenate(data)
-        # data:[7534, 2560, 2]
-        # rul_cp:[7534]
-
-        data,rul_cp = torch.tensor(data),torch.tensor(rul_cp)
-        data_set = Data.TensorDataset(data,rul_cp)
+        data,rul = dataset.get_data(_select)
+        # data :[测试总次数n,acc,2]
+        # RUL  :[测试总次数n:RUL]
+        data,rul = np.array(data),np.array(rul)
+        data,rul = torch.tensor(data),torch.tensor(rul).float()
+        data_set = Data.TensorDataset(data,rul)
         output   =   Data.DataLoader(data_set,self.batch_size)
         return output
 
@@ -162,11 +152,11 @@ class Model():
         log = OrderedDict()
         log['train_rul_acc'] = []
         log['train_rul_loss'] = []
-        dif = 1 #预测精度 0.01 相差小于 0.1 被认为预测成功
         with tqdm(total=self.epochs * len(train_iter),colour= "red") as pbar:
             batch_count = 0
             for epoch in range(1,self.epochs+1):
-                pbar.set_description(f"epoch:{epoch},total={self.epochs+1}")
+                train_acc = 0
+                pbar.set_description(f"epoch:{epoch},acc={train_acc}")
                 train_l_sum, train_acc_sum, n, start = 0.0, 0.0, 0, time.time()
                 for x,y in train_iter:
                     # x: [128, 2560, 2] :[batch,seq,feature]
@@ -178,7 +168,7 @@ class Model():
                     loss_.backward()
                     self.optimizer.step()
                     train_l_sum += loss_.cpu().item()
-                    train_acc_sum += len( [1 for index in range(len(y_hat)) if abs(y_hat[index] - y[index]) < dif])
+                    train_acc =  sum([abs(y_hat[index] - y[index]) / (y[index] + 0.1) for index in range(len(y_hat)) ])/len(y_hat)
                     n += y.shape[0]
                     batch_count += 1
                     pbar.update(1)
