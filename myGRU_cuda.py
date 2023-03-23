@@ -39,7 +39,7 @@ class GRU(nn.Module):
             nn.ReLU(),
             nn.Linear( int(self.seq_len / self.com) , int(self.seq_len / self.com) * self.feature_size),
         )
-        self.net = nn.GRU(input_size, self.hidden_size, batch_first=True,num_layers = 1)  # utilize the GRU model in torch.nn
+        self.net = nn.GRU(input_size, self.hidden_size, batch_first=True,num_layers = 1,bidirectional = bidirectional)  # utilize the GRU model in torch.nn
         self.FC = nn.Sequential(
             nn.Linear(self.hidden_size * self.dim_n,256),
             nn.ReLU(),
@@ -53,14 +53,14 @@ class GRU(nn.Module):
         x_com = self.compress_seq(x)                                      # x: [batch,seq/10*2]
         x_com = x_com.reshape(-1,int(self.seq_len / self.com),self.feature_size)# x: [batch,seq/10,2]
         x, h = self.net(x_com)                                            # x: [batch,seq/10,hid]
-        h = h.reshape(-1,self.hidden_size*self.dim_n)                     # h: [1 , batch, hid]
+        h = h.reshape(-1,self.hidden_size*self.dim_n)                     # h: [1*self.dim , batch, hid]
         h = torch.squeeze(h)                                              # h: [batch,hid]
         out = self.FC(h)
         out = torch.squeeze(out)                                          #out:[batch,1]
         return out
 class Model():
     def __init__(self,device = torch.device("cpu")):
-        self.epochs       = 2
+        self.epochs       = 10
         self.batch_size   = 128
         self.batches      = 30
         self.lr           = 0.5
@@ -87,8 +87,8 @@ class Model():
 
     def get_bear_data(self, dataset, select):
         if select == 'train':
-            # _select = ['Bearing1_1','Bearing1_2','Bearing2_1','Bearing2_2','Bearing3_1','Bearing3_2']
-            _select =['Bearing1_3','Bearing1_1']
+            _select = ['Bearing1_1','Bearing1_2','Bearing2_1','Bearing2_2','Bearing3_1','Bearing3_2']
+            # _select =['Bearing1_3','Bearing1_1']
         elif select == 'test':
             _select = ['Bearing1_3','Bearing1_4','Bearing1_5','Bearing1_6','Bearing1_7',
                         'Bearing2_3','Bearing2_4','Bearing2_5','Bearing2_6','Bearing2_7',
@@ -152,7 +152,7 @@ class Model():
                     pbar.update(1)
                     #end
                 self.scheduler.step()
-                test_err,test_loss = self.evaluate_accuracy(test_iter)#测试太慢了，暂时不进行测试
+                # test_err,test_loss = self.evaluate_accuracy(test_iter)#测试太慢了，暂时不进行测试
                 #仍然是统计部分
                 epoch_info = f'epoch{epoch + 1}, train err:{train_err_sum/batch_count :.2f}, test err:{test_err:.2f},train_loss:{train_l_sum / batch_count:.2f},test_loss:{test_loss:.2f}\n'
                 print(epoch_info)
