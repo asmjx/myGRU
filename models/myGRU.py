@@ -5,16 +5,15 @@ from torch import nn
 from tqdm import tqdm 
 import matplotlib.pyplot as plt
 import pandas as pd
-from data_phm import DataSet
+from utilis.data_phm import DataSet
 from torch.autograd import Variable
 import torch.utils.data as Data
 from collections import OrderedDict
 import time
 import matplotlib.pyplot as plt
-from config import args
 import os
 # Define GRU Neural Networks
-class GRU(nn.Module):
+class GRU_stable(nn.Module):
     """
         Parameters:
         - input_size: feature size
@@ -23,7 +22,7 @@ class GRU(nn.Module):
         - num_layers: layers of LSTM to stack
     """
 
-    def __init__(self, input_size, num_layers=1,seq_len = 2560):
+    def __init__(self, input_size, num_layers=1,seq_len = 2560,args = None):
         super().__init__()
         self.hidden_size = 256
         self.seq_len = seq_len
@@ -36,31 +35,50 @@ class GRU(nn.Module):
             self.dim_n = 1
         self.compress_seq = nn.Sequential(
             nn.Linear(self.seq_len * self.feature_size, int(self.seq_len / self.com)),
+            # nn.BatchNorm2d(2),
             nn.ReLU(),
             nn.Linear( int(self.seq_len / self.com) , int(self.seq_len / self.com) * self.feature_size),
         )
-        self.net = nn.GRU(input_size, self.hidden_size, batch_first=True,num_layers = 1)  # utilize the GRU model in torch.nn
+        self.net = nn.GRU(input_size, self.hidden_size, batch_first=True,num_layers = 1,bidirectional = bidirectional)  # utilize the GRU model in torch.nn
         self.FC = nn.Sequential(
             nn.Linear(self.hidden_size * self.dim_n,256),
             nn.ReLU(),
             nn.Dropout(0.5),
             nn.Linear(256,1),
+            # nn.BatchNorm2d(1),
             nn.ReLU()                        #此处的问题，为什么添加了ReLU或者其他的激活函数作为输出后，预测的结果之间全是0(tanh为负数)
         ) 
+        # 在此处添加论文中所指的全局信息保存的模块,保存训练中的prefeatures\pre_weight1
+        self.register_buffer('pre_features', torch.zeros(args.n_feature, args.feature_dim))
+        self.register_buffer('pre_weight1', torch.ones(args.n_feature, 1))
+        if args.n_levels > 1:
+            self.register_buffer('pre_features_2', torch.zeros(args.n_feature, args.feature_dim))
+            self.register_buffer('pre_weight1_2', torch.ones(args.n_feature, 1))
+        if args.n_levels > 2:
+            self.register_buffer('pre_features_3', torch.zeros(args.n_feature, args.feature_dim))
+            self.register_buffer('pre_weight1_3', torch.ones(args.n_feature, 1))
+        if args.n_levels > 3:
+            self.register_buffer('pre_features_4', torch.zeros(args.n_feature, args.feature_dim))
+            self.register_buffer('pre_weight1_4', torch.ones(args.n_feature, 1))
+        if args.n_levels > 4:
+            print('WARNING: THE NUMBER OF LEVELS CAN NOT BE BIGGER THAN 4')
+            
     def forward(self,x):
         x = x.to(torch.float32)                                           # x: [batch,seq , 2 ] 
         x = x.reshape(-1, self.seq_len * self.feature_size)               # x: [batch,2 * seq ]
         x_com = self.compress_seq(x)                                      # x: [batch,seq/10*2]
         x_com = x_com.reshape(-1,int(self.seq_len / self.com),self.feature_size)# x: [batch,seq/10,2]
         x, h = self.net(x_com)                                            # x: [batch,seq/10,hid]
-        h = h.reshape(-1,self.hidden_size*self.dim_n)                     # h: [1 , batch, hid]
+        h = h.reshape(-1,self.hidden_size*self.dim_n)                     # h: [1*self.dim , batch, hid]
         h = torch.squeeze(h)                                              # h: [batch,hid]
         out = self.FC(h)
         out = torch.squeeze(out)                                          #out:[batch,1]
         return out
+    
+
 class Model():
     def __init__(self,device = torch.device("cpu")):
-        self.epochs       = 2
+        self.epochs       = 10
         self.batch_size   = 128
         self.batches      = 30
         self.lr           = 0.5
@@ -87,8 +105,8 @@ class Model():
 
     def get_bear_data(self, dataset, select):
         if select == 'train':
-            # _select = ['Bearing1_1','Bearing1_2','Bearing2_1','Bearing2_2','Bearing3_1','Bearing3_2']
-            _select =['Bearing1_3','Bearing1_1']
+            _select = ['Bearing1_1','Bearing1_2','Bearing2_1','Bearing2_2','Bearing3_1','Bearing3_2']
+            # _select =['Bearing1_3','Bearing1_1']
         elif select == 'test':
             _select = ['Bearing1_3','Bearing1_4','Bearing1_5','Bearing1_6','Bearing1_7',
                         'Bearing2_3','Bearing2_4','Bearing2_5','Bearing2_6','Bearing2_7',
@@ -152,7 +170,7 @@ class Model():
                     pbar.update(1)
                     #end
                 self.scheduler.step()
-                test_err,test_loss = self.evaluate_accuracy(test_iter)#测试太慢了，暂时不进行测试
+                # test_err,test_loss = self.evaluate_accuracy(test_iter)#测试太慢了，暂时不进行测试
                 #仍然是统计部分
                 epoch_info = f'epoch{epoch + 1}, train err:{train_err_sum/batch_count :.2f}, test err:{test_err:.2f},train_loss:{train_l_sum / batch_count:.2f},test_loss:{test_loss:.2f}\n'
                 print(epoch_info)
