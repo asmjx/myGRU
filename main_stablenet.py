@@ -93,7 +93,7 @@ def main_worker(ngpus_per_node, args):
     # print('Done')
 
     num_ftrs = model.fc1.in_features
-    model.fc1 = nn.Linear(num_ftrs, args.classes_num)
+    model.fc1 = nn.Linear(num_ftrs, args.classes_num)# 偷偷改了模型的最后的全连接层
     nn.init.xavier_uniform_(model.fc1.weight, .1)
     nn.init.constant_(model.fc1.bias, 0.)
 

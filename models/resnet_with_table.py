@@ -224,8 +224,8 @@ class ResNet_with_table(nn.Module):
         x = self.layer4(x)
 
         x = self.avgpool(x)
-        x = torch.flatten(x, 1)
-        flatten_features = x
+        x = torch.flatten(x, 1) ####? x的shape是什么？
+        flatten_features = x   #[batch,self.expansion(4) * self.plane(512)] -> [batch,4*512]
         # x = self.fc(x)
         x = self.fc1(x)
 

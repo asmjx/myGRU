@@ -47,19 +47,20 @@ def train(train_loader, model, criterion, optimizer, epoch, args, tensor_writer=
             images = images.cuda(args.gpu, non_blocking=True)
         target = target.cuda(args.gpu, non_blocking=True)
 
-        output, cfeatures = model(images)
-        pre_features = model.pre_features
-        pre_weight1 = model.pre_weight1
+        output, cfeatures = model(images) # cfeatures:[batch,512 * 4] -> [128,512 * 4]
+        pre_features = model.pre_features # [n_feature,feature_dim] -> [128,512]
+        pre_weight1 = model.pre_weight1   # [n_feature,1] -> [128,1]
 
         if epoch >= args.epochp:
             weight1, pre_features, pre_weight1 = weight_learner(cfeatures, pre_features, pre_weight1, args, epoch, i)
 
         else:
+            # weight1 [batch,1] ; cfeatures [batch,?]
             weight1 = Variable(torch.ones(cfeatures.size()[0], 1).cuda())
 
         model.pre_features.data.copy_(pre_features)
         model.pre_weight1.data.copy_(pre_weight1)
-
+                                        #[1*batch] @ [batch,1] = [1*1] -> variable
         loss = criterion(output, target).view(1, -1).mm(weight1).view(1)
         acc1, acc5 = accuracy(output, target, topk=(1, 5))
         losses.update(loss.item(), images.size(0))

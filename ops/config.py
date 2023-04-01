@@ -15,46 +15,46 @@ parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18_with_table
                     choices=model_names,
                     help='model architecture: ' +
                         ' | '.join(model_names) +
-                        ' (default: resnet18)')
+                        ' (default: resnet18)') ##################这个模型结构应该需要更改
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
 parser.add_argument('--epochs', default=30, type=int, metavar='N',
-                    help='number of total epochs to run')
+                    help='number of total epochs to run') #####################epochs
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
-                    help='manual epoch number (useful on restarts)')
-parser.add_argument('-b', '--batch-size', default=128, type=int,
+                    help='manual epoch number (useful on restarts)')#####start_epochs
+parser.add_argument('-b', '--batch-size', default=128, type=int,    #batchsize
                     metavar='N',
                     help='mini-batch size (default: 256), this is the total '
                          'batch size of all GPUs on the current node when '
                          'using Data Parallel or Distributed Data Parallel')
 parser.add_argument('--lr', '--learning-rate', default=0.01, type=float,
-                    metavar='LR', help='initial learning rate', dest='lr')
+                    metavar='LR', help='initial learning rate', dest='lr')# 学习率部分，应该会有学习率下降
 parser.add_argument('--cos', '--cosine_lr', default=1, type=int,
-                    metavar='COS', help='lr decay by decay', dest='cos')
-parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
+                    metavar='COS', help='lr decay by decay', dest='cos')  # 学习率衰减的一个选项
+parser.add_argument('--momentum', default=0.9, type=float, metavar='M',   # 动量
                     help='momentum')
-parser.add_argument('--wd', '--weight-decay', default=1e-4, type=float,
+parser.add_argument('--wd', '--weight-decay', default=1e-4, type=float,   #权值衰减，大概是一个正则化项
                     metavar='W', help='weight decay (default: 1e-4)',
                     dest='weight_decay')
-parser.add_argument('-p', '--print-freq', default=10, type=int,
+parser.add_argument('-p', '--print-freq', default=10, type=int,           # 只是一个打印的参数
                     metavar='N', help='print frequency (default: 10)')
-parser.add_argument('--resume', default='', type=str, metavar='PATH',
+parser.add_argument('--resume', default='', type=str, metavar='PATH',     # 从某一个加载点重新加载，还是有用的这个
                     help='path to latest checkpoint (default: none)')
 
 parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
-                    help='evaluate model on validation set')
-parser.add_argument('--pretrained', default=True, type=bool, help='use pre-trained model')
+                    help='evaluate model on validation set')              # 在测试集上面评估模型
+parser.add_argument('--pretrained', default=True, type=bool, help='use pre-trained model') #预训练，大概不需要
 parser.add_argument('--world-size', default=-1, type=int,
-                    help='number of nodes for distributed training')
-parser.add_argument('--rank', default=-1, type=int,
-                    help='node rank for distributed training')
+                    help='number of nodes for distributed training')      # 分布式训练？
+parser.add_argument('--rank', default=-1, type=int,               
+                    help='node rank for distributed training')            # 分布式训练的设备优先级
 parser.add_argument('--dist-url', default='tcp://224.66.41.62:23456', type=str,
-                    help='url used to set up distributed training')
-parser.add_argument('--dist-backend', default='nccl', type=str,
+                    help='url used to set up distributed training')       # 分布式训练还要用tcp协议链接
+parser.add_argument('--dist-backend', default='nccl', type=str,           # ?
                     help='distributed backend')
-parser.add_argument('--seed', default=3, type=int,
+parser.add_argument('--seed', default=3, type=int,                        # 初始化的随机种子，可能会影响结果
                     help='seed for initializing training. ')
-parser.add_argument('--gpu', default=None, type=int,
+parser.add_argument('--gpu', default=None, type=int,                      # TODO:把这个都改成 todevice(args.gpu) ?
                     help='GPU id to use.')
 parser.add_argument('--multiprocessing-distributed', action='store_true',
                     help='Use multi-processing distributed training to launch '
@@ -64,26 +64,26 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
 
 parser.add_argument('--log_base',
                     default='./results', type=str, metavar='PATH',
-                    help='path to save logs (default: none)')
+                    help='path to save logs (default: none)')    
 
 # for number of fourier spaces
 parser.add_argument ('--num_f', type=int, default=1, help = 'number of fourier spaces')
 
 parser.add_argument ('--sample_rate', type=float, default=1.0, help = 'sample ratio of the features involved in balancing')
-parser.add_argument ('--lrbl', type = float, default = 1.0, help = 'learning rate of balance')
+parser.add_argument ('--lrbl', type = float, default = 1.0, help = 'learning rate of balance')#这个大概是权重学习那里的学习率
 
 # parser.add_argument ('--cfs', type = int, default = 512, help = 'the dim of each feature')
 parser.add_argument ('--lambdap', type = float, default = 70.0, help = 'weight decay for weight1 ')
-parser.add_argument ('--lambdapre', type = float, default = 1, help = 'weight for pre_weight1 ')
+parser.add_argument ('--lambdapre', type = float, default = 1, help = 'weight for pre_weight1 ')# No USE
 
-parser.add_argument ('--epochb', type = int, default = 20, help = 'number of epochs to balance')
+parser.add_argument ('--epochb', type = int, default = 20, help = 'number of epochs to balance') # 由当前权重值求得下一次权重值和的epoch
 parser.add_argument ('--epochp', type = int, default = 0, help = 'number of epochs to pretrain')
 
-parser.add_argument ('--n_feature', type=int, default=128, help = 'number of pre-saved features')
+parser.add_argument ('--n_feature', type=int, default=128, help = 'number of pre-saved features')# 这里必须注意 n_feature应该需要和batch_size相同吧？？？
 parser.add_argument ('--feature_dim', type=int, default=512, help = 'the dim of each feature')
 
-parser.add_argument ('--lrwarmup_epo', type=int, default=0, help = 'the dim of each feature')
-parser.add_argument ('--lrwarmup_decay', type=int, default=0.1, help = 'the dim of each feature')
+parser.add_argument ('--lrwarmup_epo', type=int, default=0, help = 'the dim of each feature') #？？？
+parser.add_argument ('--lrwarmup_decay', type=int, default=0.1, help = 'the dim of each feature') #???
 
 parser.add_argument ('--n_levels', type=int, default=1, help = 'number of global table levels')
 
@@ -93,11 +93,11 @@ parser.add_argument ('--lambda_decay_epoch', type=int, default=5, help = 'number
 parser.add_argument ('--min_lambda_times', type=float, default=0.01, help = 'number of global table levels')
 
 # for jointly train
-parser.add_argument ('--train_cnn_with_lossb', type=bool, default=False, help = 'whether train cnn with lossb')
-parser.add_argument ('--cnn_lossb_lambda', type=float, default=0, help = 'lambda for lossb')
+parser.add_argument ('--train_cnn_with_lossb', type=bool, default=False, help = 'whether train cnn with lossb')#???
+parser.add_argument ('--cnn_lossb_lambda', type=float, default=0, help = 'lambda for lossb')#??
 
 # for more moments
-parser.add_argument ('--moments_lossb', type=float, default=1, help = 'number of moments')
+parser.add_argument ('--moments_lossb', type=float, default=1, help = 'number of moments') #???
 
 # for first step
 parser.add_argument ('--first_step_cons', type=float, default=1, help = 'constrain the weight at the first step')

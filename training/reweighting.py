@@ -8,11 +8,11 @@ from training.schedule import lr_setter
 
 def weight_learner(cfeatures, pre_features, pre_weight1, args, global_epoch=0, iter=0):
     softmax = nn.Softmax(0)
-    weight = Variable(torch.ones(cfeatures.size()[0], 1).cuda())
+    weight = Variable(torch.ones(cfeatures.size()[0], 1).cuda())# [batch , 1]
     weight.requires_grad = True
-    cfeaturec = Variable(torch.FloatTensor(cfeatures.size()).cuda())
-    cfeaturec.data.copy_(cfeatures.data)
-    all_feature = torch.cat([cfeaturec, pre_features.detach()], dim=0)
+    cfeaturec = Variable(torch.FloatTensor(cfeatures.size()).cuda()) #[batch,512 * 4] -> [128,512 * 4]
+    cfeaturec.data.copy_(cfeatures.data)   
+    all_feature = torch.cat([cfeaturec, pre_features.detach()], dim=0) #pre_features [n_feature,feature_dim] -> [128,512]
     optimizerbl = torch.optim.SGD([weight], lr=args.lrbl, momentum=0.9)
 
     for epoch in range(args.epochb):
@@ -34,7 +34,7 @@ def weight_learner(cfeatures, pre_features, pre_weight1, args, global_epoch=0, i
     if global_epoch == 0 and iter < 10:
         pre_features = (pre_features * iter + cfeatures) / (iter + 1)
         pre_weight1 = (pre_weight1 * iter + weight) / (iter + 1)
-
+    ##################此处需要继续研究这里的size问题！！！！！！！！！！！！！他是如何拼接的！！！！
     elif cfeatures.size()[0] < pre_features.size()[0]:
         pre_features[:cfeatures.size()[0]] = pre_features[:cfeatures.size()[0]] * args.presave_ratio + cfeatures * (
                     1 - args.presave_ratio)

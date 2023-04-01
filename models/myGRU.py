@@ -62,7 +62,7 @@ class GRU_stable(nn.Module):
             self.register_buffer('pre_weight1_4', torch.ones(args.n_feature, 1))
         if args.n_levels > 4:
             print('WARNING: THE NUMBER OF LEVELS CAN NOT BE BIGGER THAN 4')
-            
+
     def forward(self,x):
         x = x.to(torch.float32)                                           # x: [batch,seq , 2 ] 
         x = x.reshape(-1, self.seq_len * self.feature_size)               # x: [batch,2 * seq ]
@@ -71,10 +71,34 @@ class GRU_stable(nn.Module):
         x, h = self.net(x_com)                                            # x: [batch,seq/10,hid]
         h = h.reshape(-1,self.hidden_size*self.dim_n)                     # h: [1*self.dim , batch, hid]
         h = torch.squeeze(h)                                              # h: [batch,hid]
+        flatten_featuers = torch.flatten(h,1)
         out = self.FC(h)
         out = torch.squeeze(out)                                          #out:[batch,1]
-        return out
+        return out,flatten_featuers
     
+def myGRU_with_table( input_size, num_layers=1,seq_len = 2560,args = None):
+    '''
+    '''
+    return GRU_stable( input_size, num_layers,seq_len,args)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 class Model():
     def __init__(self,device = torch.device("cpu")):
@@ -84,7 +108,7 @@ class Model():
         self.lr           = 0.5
         self.feature_size = 2
         self.device = device
-        self.network      = GRU(self.feature_size)
+        self.network      = GRU_stable(self.feature_size)
         self.optimizer    =  torch.optim.Adam(self.network.parameters(),lr=self.lr,weight_decay=1e-4)
         self.loss         = nn.CrossEntropyLoss()
         self.loss         = nn.MSELoss()
@@ -123,6 +147,7 @@ class Model():
         output   =   Data.DataLoader(data_set,self.batch_size,shuffle=True)
         return output
 
+
     def train(self):
         dataset = DataSet.load_dataset("phm_data")
         train_iter = self.get_bear_data(dataset,'train')
@@ -148,7 +173,7 @@ class Model():
                     y = y.to(device)
                     # x: [128, 2560, 2] :[batch,seq,feature]
                     # y: [128]          :[batch:rul]
-                    y_hat = self.network(x).to(device)
+                    y_hat,_ = self.network(x).to(device)
                     # y_hat:[128]
                     loss_ = self.loss(y_hat,y)
                     self.optimizer.zero_grad()
