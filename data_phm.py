@@ -128,6 +128,6 @@ class DataSet(object):
 
 
 if __name__ == '__main__':
-    # phm = DataSet()
+    phm = DataSet()
     dataset = DataSet.load_dataset('phm_data')
     print('1')

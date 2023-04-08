@@ -11,7 +11,7 @@ import torch.utils.data as Data
 from collections import OrderedDict
 import time
 import matplotlib.pyplot as plt
-from config import args
+# from config import args
 import os
 # Define GRU Neural Networks
 class GRU(nn.Module):
@@ -28,7 +28,7 @@ class GRU(nn.Module):
         self.hidden_size = 256
         self.seq_len = seq_len
         self.feature_size = input_size
-        bidirectional  = False # 是否是双向网络
+        bidirectional  = True # 是否是双向网络
         self.com = 10         # seq 放缩倍数
         if bidirectional:
             self.dim_n = 2
@@ -60,18 +60,18 @@ class GRU(nn.Module):
         return out
 class Model():
     def __init__(self,device = torch.device("cpu")):
-        self.epochs       = 10
+        self.epochs       = 1
         self.batch_size   = 128
         self.batches      = 30
         self.lr           = 0.5
         self.feature_size = 2
         self.device = device
-        self.network      = GRU(self.feature_size)
+        self.network      = GRU(self.feature_size).to(device)
         self.optimizer    =  torch.optim.Adam(self.network.parameters(),lr=self.lr,weight_decay=1e-4)
         self.loss         = nn.CrossEntropyLoss()
         self.loss         = nn.MSELoss()
         self.save_log_path = "./log"
-        # self.loss         = nn.KLDivLoss(reduction='batchmean') # KL 散度可用于衡量不同的连续分布之间的距离, 在连续的输出分布的空间上(离散采样)上进行直接回归时
+        # self.loss         = nn.KLDivLoss(reduction='batch·ean') # KL 散度可用于衡量不同的连续分布之间的距离, 在连续的输出分布的空间上(离散采样)上进行直接回归时
         lambda1 = lambda epoch: 1 / (epoch + 1) #调整学习率
         self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=[lambda1])
 
@@ -137,9 +137,9 @@ class Model():
                     loss_.backward()
                     self.optimizer.step()
                     # 统计部分$$$$$$$$$$
-                    y_hat = y_hat.detach().numpy()
-                    loss_ = loss_.detach().numpy()
-                    y     = y.detach().numpy()
+                    y_hat = y_hat.detach().cpu().numpy()
+                    loss_ = loss_.detach().cpu().numpy()
+                    y     = y.detach().cpu().numpy()
                     train_l_sum += loss_
                     sample.write("{}\n".format(  list(map(int,y_hat[0:10] ) )    ))
                     sample.write("{}\n\n".format(list (map(int,y[0:10]         ))     ))
@@ -152,7 +152,7 @@ class Model():
                     pbar.update(1)
                     #end
                 self.scheduler.step()
-                # test_err,test_loss = self.evaluate_accuracy(test_iter)#测试太慢了，暂时不进行测试
+                test_err,test_loss = self.evaluate_accuracy(test_iter)#测试太慢了，暂时不进行测试
                 #仍然是统计部分
                 epoch_info = f'epoch{epoch + 1}, train err:{train_err_sum/batch_count :.2f}, test err:{test_err:.2f},train_loss:{train_l_sum / batch_count:.2f},test_loss:{test_loss:.2f}\n'
                 print(epoch_info)
@@ -166,7 +166,7 @@ class Model():
 
             #训练结束后保存图像
             self.paint(log)
-            torch.save(self.network, 'model/GRU_net.pkl')
+            torch.save(self.network.cpu(), 'model/GRU_net.pkl')
             model = torch.load('model/GRU_net.pkl') 
 
     def evaluate_accuracy(self,data_iter):
@@ -191,26 +191,26 @@ class Model():
         return test_err_sum/batch_count, test_loss_sum/batch_count
     
     def paint(self,log:OrderedDict):
-            fig1 = plt.figure(1)
-            fig2 = plt.figure(2)
-            ax1 = fig1.subplots() 
-            ax2 = fig2.subplots()
-            ax1.plot(log['train_err'], label="train_err")
-            ax1.plot(log['test_err'],label = "test_err")
-            ax2.plot(log['train_loss'], label="train_loss")
-            ax2.plot(log['test_loss'],label = "test_loss")
-            ax1.set_title("err")
-            ax2.set_title("loss")
-            ax1.legend()
-            ax2.legend()
-            # plt.show()
-            fig1.savefig(os.path.join(self.save_log_path,"fig1.png"))
-            fig2.savefig(os.path.join(self.save_log_path,"fig2.png"))
+        fig1 = plt.figure(1)
+        fig2 = plt.figure(2)
+        ax1 = fig1.subplots() 
+        ax2 = fig2.subplots()
+        ax1.plot(log['train_err'], label="train_err")
+        ax1.plot(log['test_err'],label = "test_err")
+        ax2.plot(log['train_loss'], label="train_loss")
+        ax2.plot(log['test_loss'],label = "test_loss")
+        ax1.set_title("err")
+        ax2.set_title("loss")
+        ax1.legend()
+        ax2.legend()
+        # plt.show()
+        fig1.savefig(os.path.join(self.save_log_path,"fig1.png"))
+        fig2.savefig(os.path.join(self.save_log_path,"fig2.png"))
 
 
 
 if __name__ == '__main__':
     torch.backends.cudnn.enabled=False
-    device = torch.device("cpu")
-    process = Model()
+    device = torch.device("cuda")
+    process = Model(device= device)
     process.train()

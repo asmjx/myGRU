@@ -266,6 +266,8 @@ class DataSet(object):
         '''
         assert self.name != ''
         assert self.save_path != ''
+        if not os.path.exists(self.save_path):
+            os.makedirs(self.save_path)
         pickle.dump(self, open(self.save_path + 'DataSet_' +
                                      self.name + '.pkl', 'wb'), True)
         # self._save_info()

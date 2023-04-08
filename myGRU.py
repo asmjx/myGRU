@@ -10,7 +10,7 @@ from torch.autograd import Variable
 import torch.utils.data as Data
 from collections import OrderedDict
 import time
-from config import args
+# from config import args
 # Define GRU Neural Networks
 class GRU(nn.Module):
     """
