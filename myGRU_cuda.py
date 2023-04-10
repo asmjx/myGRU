@@ -217,5 +217,7 @@ if __name__ == '__main__':
     if torch.cuda.is_available():
         device = torch.device("cuda")
         print("use GPU")
-    process = Model(device= device)
-    process.train()
+    else:
+        print("use CPU")
+    # process = Model(device= device)
+    # process.train()
