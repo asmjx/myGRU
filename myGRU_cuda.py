@@ -39,11 +39,11 @@ class GRU(nn.Module):
             nn.ReLU(),
             nn.Linear( int(self.seq_len / self.com) , int(self.seq_len / self.com) * self.feature_size),
         )
-        self.net = nn.GRU(input_size, self.hidden_size, batch_first=True,num_layers = 1,bidirectional = bidirectional)  # utilize the GRU model in torch.nn
+        self.net = nn.GRU(input_size, self.hidden_size, batch_first=True,num_layers = num_layers ,bidirectional = bidirectional)  # utilize the GRU model in torch.nn
         self.FC = nn.Sequential(
             nn.Linear(self.hidden_size * self.dim_n,256),
             nn.ReLU(),
-            nn.Dropout(0.5),
+            # nn.Dropout(0.5),
             nn.Linear(256,1),
             nn.ReLU()                        #此处的问题，为什么添加了ReLU或者其他的激活函数作为输出后，预测的结果之间全是0(tanh为负数)
         ) 
@@ -58,20 +58,21 @@ class GRU(nn.Module):
         out = self.FC(h)
         out = torch.squeeze(out)                                          #out:[batch,1]
         return out
+    
 class Model():
     def __init__(self,device = torch.device("cpu")):
-        self.epochs       = 1
+        self.epochs       = 200
         self.batch_size   = 128
         self.batches      = 30
-        self.lr           = 0.5
+        self.lr           = 1
         self.feature_size = 2
         self.device = device
         self.network      = GRU(self.feature_size).to(device)
         self.optimizer    =  torch.optim.Adam(self.network.parameters(),lr=self.lr,weight_decay=1e-4)
         self.loss         = nn.CrossEntropyLoss()
-        self.loss         = nn.MSELoss()
+        # self.loss         = nn.MSELoss()
         self.save_log_path = "./log"
-        # self.loss         = nn.KLDivLoss(reduction='batch·ean') # KL 散度可用于衡量不同的连续分布之间的距离, 在连续的输出分布的空间上(离散采样)上进行直接回归时
+        # self.loss         = nn.KLDivLoss(reduction='batchmean') # KL 散度可用于衡量不同的连续分布之间的距离, 在连续的输出分布的空间上(离散采样)上进行直接回归时
         lambda1 = lambda epoch: 1 / (epoch + 1) #调整学习率
         self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=[lambda1])
 
@@ -96,13 +97,13 @@ class Model():
             # _select = ['Bearing1_2','Bearing2_2','Bearing3_2']
         else:
             raise ValueError('wrong select!')
-        data,rul = dataset.get_data(_select)
+        data,rul = dataset.get_data(_select,is_percent = True)
         # data :[测试总次数n,acc,2]
         # RUL  :[测试总次数n:RUL]
         data,rul = np.array(data),np.array(rul)
         data,rul = torch.tensor(data),torch.tensor(rul).float()
         data_set = Data.TensorDataset(data,rul)
-        output   =   Data.DataLoader(data_set,self.batch_size,shuffle=True)
+        output   =   Data.DataLoader(data_set,self.batch_size,shuffle = True)
         return output
 
     def train(self):
@@ -126,6 +127,7 @@ class Model():
                 test_err = 0
                 #这里的无论是loss还是Err 都是一个batch数据的和
                 for x,y in train_iter:
+                    self.network.train()
                     x = x.to(device)
                     y = y.to(device)
                     # x: [128, 2560, 2] :[batch,seq,feature]
@@ -151,7 +153,7 @@ class Model():
                     pbar.set_description("epoch:{},err={:.2f}".format(epoch,train_err))
                     pbar.update(1)
                     #end
-                self.scheduler.step()
+                self.scheduler.step() # 调整学习率
                 test_err,test_loss = self.evaluate_accuracy(test_iter)#测试太慢了，暂时不进行测试
                 #仍然是统计部分
                 epoch_info = f'epoch{epoch + 1}, train err:{train_err_sum/batch_count :.2f}, test err:{test_err:.2f},train_loss:{train_l_sum / batch_count:.2f},test_loss:{test_loss:.2f}\n'
@@ -180,7 +182,7 @@ class Model():
                 y = y.to(self.device)
 
                 net.eval()  # 评估模式, 这会关闭dropout
-                y_hat = self.network(x).to(device)
+                y_hat = net(x).to(device)
                 loss = self.loss(y_hat,y)
                 net.train()  # 改回训练模式
 
@@ -211,6 +213,9 @@ class Model():
 
 if __name__ == '__main__':
     torch.backends.cudnn.enabled=False
-    device = torch.device("cuda")
+    device = torch.device("cpu")
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+        print("use GPU")
     process = Model(device= device)
     process.train()
