@@ -143,8 +143,8 @@ class Model():
                     loss_ = loss_.detach().cpu().numpy()
                     y     = y.detach().cpu().numpy()
                     train_l_sum += loss_
-                    sample.write("{}\n".format(  list(map(int,y_hat[0:10] ) )    ))
-                    sample.write("{}\n\n".format(list (map(int,y[0:10]         ))     ))
+                    sample.write("{:.3f}\n".format(  list(map(int,y_hat ) )    ))
+                    sample.write("{:.3f}\n\n".format(list (map(int,y         ))     ))
                     sample.flush()
                     train_err = sum([abs(y_hat[index] - y[index]) / (y[index]) for index in range(len(y_hat)) if y[index] != 0])/len(y_hat)
                     train_err_sum += train_err
