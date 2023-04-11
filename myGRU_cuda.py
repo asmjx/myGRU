@@ -10,7 +10,7 @@ import torch.utils.data as Data
 from collections import OrderedDict
 import time
 import matplotlib.pyplot as plt
-import torch_directml
+# import torch_directml
 # from config import args
 import os
 # Define GRU Neural Networks
@@ -28,7 +28,7 @@ class GRU(nn.Module):
         self.hidden_size = 256
         self.seq_len = seq_len
         self.feature_size = input_size
-        bidirectional  = True # 是否是双向网络
+        bidirectional  = False # 是否是双向网络
         self.com = 10         # seq 放缩倍数
         if bidirectional:
             self.dim_n = 2
@@ -39,11 +39,11 @@ class GRU(nn.Module):
             nn.ReLU(),
             nn.Linear( int(self.seq_len / self.com) , int(self.seq_len / self.com) * self.feature_size),
         )
-        self.net = nn.GRU(input_size, self.hidden_size, batch_first=True,num_layers = num_layers ,bidirectional = bidirectional)  # utilize the GRU model in torch.nn
+        self.net = nn.GRU(input_size, self.hidden_size, batch_first=True,num_layers = num_layers ,bidirectional = bidirectional,dropout = 0.3)  # utilize the GRU model in torch.nn
         self.FC = nn.Sequential(
             nn.Linear(self.hidden_size * self.dim_n,256),
             nn.ReLU(),
-            # nn.Dropout(0.5),
+            nn.Dropout(0.5),
             nn.Linear(256,1),
             nn.ReLU(),                        #此处的问题，为什么添加了ReLU或者其他的激活函数作为输出后，预测的结果之间全是0(tanh为负数)
             #nn.Sigmoid()
@@ -65,18 +65,18 @@ class Model():
         self.epochs       = 200
         self.batch_size   = 128
         self.batches      = 30
-        self.lr           = 0.01
+        self.lr           = 0.1
         self.feature_size = 2
         self.device = device
         self.network      = GRU(self.feature_size).to(device)
         # self.optimizer    =  torch.optim.Adam(self.network.parameters(),lr=self.lr,weight_decay=1e-4)
-        self.optimizer    =  torch.optim.SGD(self.network.parameters(),lr=self.lr,weight_decay=1e-4)
+        self.optimizer    =  torch.optim.SGD(self.network.parameters(),lr=self.lr,weight_decay=1e-4,momentum=0.78)
         # self.loss         = nn.CrossEntropyLoss()
         self.loss         = nn.MSELoss()
         self.save_log_path = "./log"
         # self.loss         = nn.KLDivLoss(reduction='batchmean') # KL 散度可用于衡量不同的连续分布之间的距离, 在连续的输出分布的空间上(离散采样)上进行直接回归时
-        lambda1 = lambda epoch: 1 / (epoch + 1) #调整学习率
-        self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=[lambda1])
+        # lambda1 = lambda epoch: 1 / (epoch + 1) #调整学习率
+        # self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=[lambda1])
 
         self.initLogF()
 
@@ -90,8 +90,9 @@ class Model():
 
     def get_bear_data(self, dataset, select):
         if select == 'train':
-            _select = ['Bearing1_1','Bearing1_2','Bearing2_1','Bearing2_2','Bearing3_1','Bearing3_2']
+            # _select = ['Bearing1_1','Bearing1_2','Bearing2_1','Bearing2_2','Bearing3_1','Bearing3_2']
             # _select =['Bearing1_3','Bearing1_1']
+            _select =['Bearing1_1']
         elif select == 'test':
             _select = ['Bearing1_3','Bearing1_4','Bearing1_5','Bearing1_6','Bearing1_7',
                         'Bearing2_3','Bearing2_4','Bearing2_5','Bearing2_6','Bearing2_7',
@@ -120,6 +121,9 @@ class Model():
         log['train_loss'] = []
         log['test_loss'] = []
         sample = open(os.path.join(self.save_log_path,"sample.log"),"w",encoding="utf-8") 
+        # tx,ty = 1,1
+        # for x,y in test_iter:
+        #     tx,ty = x,y
         with tqdm(total=self.epochs * len(train_iter),colour= "red") as pbar:
             for epoch in range(1,self.epochs+1):
                 #训练的过程记录数据
@@ -129,6 +133,7 @@ class Model():
                 test_err = 0
                 #这里的无论是loss还是Err 都是一个batch数据的和
                 for x,y in train_iter:
+                    # x,y = tx,ty
                     self.network.train()
                     x = x.to(device)
                     y = y.to(device)
@@ -153,8 +158,8 @@ class Model():
                     pbar.set_description("epoch:{},err:{:.2f},loss:{:.4f}".format(epoch,train_err,loss_))
                     pbar.update(1)
                     #end
-                self.scheduler.step() # 调整学习率
-                test_err,test_loss = self.evaluate_accuracy(test_iter)#测试太慢了，暂时不进行测试
+                # self.scheduler.step() # 调整学习率
+                # test_err,test_loss = self.evaluate_accuracy(test_iter)#测试太慢了，暂时不进行测试
                 #仍然是统计部分
                 epoch_info = f'epoch{epoch + 1}, train err:{train_err_sum/batch_count :.2f}, test err:{test_err:.2f},train_loss:{train_l_sum / batch_count:.2f},test_loss:{test_loss:.2f}\n'
                 print(epoch_info)
@@ -187,6 +192,8 @@ class Model():
                 net.train()  # 改回训练模式
 
                 test_loss_sum += loss.cpu().item()
+                y_hat = y_hat.detach().cpu().numpy()
+                y     = y.detach().cpu().numpy()
                 test_err = sum([abs(y_hat[index] - y[index]) / (y[index]) for index in range(len(y_hat)) if y[index] != 0])/len(y_hat)
                 test_err_sum += test_err
                 batch_count += 1
@@ -217,7 +224,7 @@ class Model():
             sample.write("{:.4f} ".format(y[i]))
         sample.write("\n")
         for i in range(size):
-            sample.write("{:<6} ".format(y_hat[i]))
+            sample.write("{:.4f} ".format(y_hat[i]))
         sample.write("\n\n")
         sample.flush()
 
@@ -225,7 +232,8 @@ class Model():
 
 if __name__ == '__main__':
     # torch.backends.cudnn.enabled=False
-    device = torch_directml.device()
+    # device = torch_directml.device()
+    device = torch.device("cuda")
     print("use device:{}".format(device))
     process = Model(device= device)
     process.train()

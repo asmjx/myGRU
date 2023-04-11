@@ -12,7 +12,7 @@ import torch.utils.data as Data
 import pandas as pd
 from collections import OrderedDict
 import time
-
+import os
 
 class LSTM(nn.Module):
     def __init__(self, feature_size,seq_len = 2560):
@@ -20,6 +20,7 @@ class LSTM(nn.Module):
         self.hidden_size = 256
         self.seq_len = seq_len
         self.feature_size = feature_size
+        self.com = 10         # seq 放缩倍数
         bidirectional  = False
         if bidirectional:
             self.dim_n = 2
@@ -28,9 +29,9 @@ class LSTM(nn.Module):
         #序列太长了，训练太久了，需要进行压缩下
         # input x:[batch,seq,2] ->[batch,2 *seq] ->  [batch,seq/10 * 2] -> [batch,seq/10,2]
         self.compress_seq = nn.Sequential(
-            nn.Linear(self.seq_len * feature_size, int(self.seq_len / 10)),
+            nn.Linear(self.seq_len * feature_size, int(self.seq_len / self.com)),
             nn.ReLU(),
-            nn.Linear( int(self.seq_len / 10) , int(self.seq_len / 10) * feature_size),
+            nn.Linear( int(self.seq_len / self.com) , int(self.seq_len / self.com) * feature_size),
         )
         # compress_seq: [batch,seq / 10 * feature_size]
         # reshape     : [batch,seq / 10 , feature_size]
@@ -70,37 +71,52 @@ class LSTM(nn.Module):
         #[batch,1]
         return out
     
-    # def forward(self,x):
-    #     '''
-    #     使用out作为LSTM输出
-    #     最终输出[batch*seq,1]
-    #     '''
-    #     x = x.to(torch.float32)
-    #     output,h = self.net(x)
-    #     # output = output.transpose(1,2)
-    #     # output = self.maxpool(output)
-    #     output = output.reshape(-1,self.hidden_size*self.dim_n)
-    #     out = self.FC(output)
-    #     #[batch*seq,1]
-    #     return out
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 class Model():
-    def __init__(self):
+    def __init__(self,device = torch.device("cpu")):
         self.epochs       = 200
         self.batch_size   = 128
         self.batches      = 30
         self.lr           = 1e-3
         self.feature_size = 2
-        self.network      = LSTM(self.feature_size)
+        self.network      = LSTM(self.feature_size).to(device)
         self.optimizer    =  torch.optim.Adam(self.network.parameters(),lr=self.lr,weight_decay=1e-4)
         self.loss         = nn.CrossEntropyLoss()
+        self.loss         = nn.MSELoss()
+        self.save_log_path = "./log"
 
 
 
     def get_bear_data(self, dataset, select):
         if select == 'train':
-            # _select = ['Bearing1_1','Bearing1_2','Bearing2_1','Bearing2_2','Bearing3_1','Bearing3_2']
-            _select =['Bearing1_3','Bearing1_1']
+            _select = ['Bearing1_1','Bearing1_2','Bearing2_1','Bearing2_2','Bearing3_1','Bearing3_2']
+            # _select =['Bearing1_3','Bearing1_1']
         elif select == 'test':
             _select = ['Bearing1_3','Bearing1_4','Bearing1_5','Bearing1_6','Bearing1_7',
                         'Bearing2_3','Bearing2_4','Bearing2_5','Bearing2_6','Bearing2_7',
@@ -108,13 +124,13 @@ class Model():
             # _select = ['Bearing1_2','Bearing2_2','Bearing3_2']
         else:
             raise ValueError('wrong select!')
-        data,rul = dataset.get_data(_select)
+        data,rul = dataset.get_data(_select,is_percent = True)
         # data :[测试总次数n,acc,2]
         # RUL  :[测试总次数n:RUL]
         data,rul = np.array(data),np.array(rul)
         data,rul = torch.tensor(data),torch.tensor(rul).float()
         data_set = Data.TensorDataset(data,rul)
-        output   =   Data.DataLoader(data_set,self.batch_size)
+        output   =   Data.DataLoader(data_set,self.batch_size,shuffle=True)
         return output
 
 
@@ -152,6 +168,7 @@ class Model():
         log = OrderedDict()
         log['train_rul_acc'] = []
         log['train_rul_loss'] = []
+        sample = open(os.path.join(self.save_log_path,"sample.log"),"w",encoding="utf-8") 
         with tqdm(total=self.epochs * len(train_iter),colour= "red") as pbar:
             batch_count = 0
             for epoch in range(1,self.epochs+1):
@@ -161,21 +178,31 @@ class Model():
                 for x,y in train_iter:
                     # x: [128, 2560, 2] :[batch,seq,feature]
                     # y: [128]          :[batch:rul]
-                    y_hat = self.network(x)
+                    x = x.to(device)
+                    y = y.to(device)
+                    y_hat = self.network(x).to(device)
                     # y_hat:[128]
                     loss_ = self.loss(y_hat,y)
                     self.optimizer.zero_grad()
                     loss_.backward()
                     self.optimizer.step()
-                    train_l_sum += loss_.cpu().item()
-                    train_acc =  sum([abs(y_hat[index] - y[index]) / (y[index] + 0.1) for index in range(len(y_hat)) ])/len(y_hat)
+
+                    y_hat = y_hat.detach().cpu().numpy()
+                    loss_ = loss_.detach().cpu().numpy()
+                    y     = y.detach().cpu().numpy()
+                    train_l_sum += loss_
+                    self.sample_write(sample,y_hat,y)
+                    train_err = sum([abs(y_hat[index] - y[index]) / (y[index]) for index in range(len(y_hat)) if y[index] != 0])/len(y_hat)
+                    # train_acc =  sum([abs(y_hat[index] - y[index]) / (y[index] + 0.1) for index in range(len(y_hat)) ])/len(y_hat)
                     n += y.shape[0]
                     batch_count += 1
+                    pbar.set_description("epoch:{},err:{:.2f},loss:{:.4f}".format(epoch,train_err,loss_))
                     pbar.update(1)
                 # test_acc = self.evaluate_accuracy(test_iter)#测试太慢了，暂时不进行测试
                 test_acc = 0.5
                 print('epoch %d, loss %.4f, train acc %.3f, test acc %.3f,time %.1f sec'% (epoch + 1, train_l_sum / batch_count, train_acc_sum / n,
                     test_acc, time.time() - start))
+                
                 
                 log['train_rul_acc'].append(train_acc_sum / n)
                 log['train_rul_loss'].append(train_l_sum / batch_count)
@@ -185,9 +212,23 @@ class Model():
             torch.save(self.net, 'model/LSTM_net.pkl')
             model = torch.load('model/LSTM_net.pkl') 
 
+    def sample_write(self,sample,y_hat,y,size = None):
+        '''向sample写入日志'''
+        size = size  if size and size < self.batch_size  else len(y_hat)
+        for i in range(size):
+            sample.write("{:.4f} ".format(y[i]))
+        sample.write("\n")
+        for i in range(size):
+            sample.write("{:.4f} ".format(y_hat[i]))
+        sample.write("\n\n")
+        sample.flush()
+
 
 
 if __name__ == '__main__':
-    torch.backends.cudnn.enabled=False
-    process = Model()
+    # torch.backends.cudnn.enabled=False
+    # device = torch_directml.device()
+    device = torch.device("cuda")
+    print("use device:{}".format(device))
+    process = Model(device= device)
     process.train()
