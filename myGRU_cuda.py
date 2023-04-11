@@ -45,7 +45,8 @@ class GRU(nn.Module):
             nn.ReLU(),
             # nn.Dropout(0.5),
             nn.Linear(256,1),
-            nn.ReLU()                        #此处的问题，为什么添加了ReLU或者其他的激活函数作为输出后，预测的结果之间全是0(tanh为负数)
+            nn.ReLU(),                        #此处的问题，为什么添加了ReLU或者其他的激活函数作为输出后，预测的结果之间全是0(tanh为负数)
+            #nn.Sigmoid()
         ) 
     def forward(self,x):
         x = x.to(torch.float32)                                           # x: [batch,seq , 2 ] 
@@ -64,13 +65,14 @@ class Model():
         self.epochs       = 200
         self.batch_size   = 128
         self.batches      = 30
-        self.lr           = 1
+        self.lr           = 0.01
         self.feature_size = 2
         self.device = device
         self.network      = GRU(self.feature_size).to(device)
-        self.optimizer    =  torch.optim.Adam(self.network.parameters(),lr=self.lr,weight_decay=1e-4)
-        self.loss         = nn.CrossEntropyLoss()
-        # self.loss         = nn.MSELoss()
+        # self.optimizer    =  torch.optim.Adam(self.network.parameters(),lr=self.lr,weight_decay=1e-4)
+        self.optimizer    =  torch.optim.SGD(self.network.parameters(),lr=self.lr,weight_decay=1e-4)
+        # self.loss         = nn.CrossEntropyLoss()
+        self.loss         = nn.MSELoss()
         self.save_log_path = "./log"
         # self.loss         = nn.KLDivLoss(reduction='batchmean') # KL 散度可用于衡量不同的连续分布之间的距离, 在连续的输出分布的空间上(离散采样)上进行直接回归时
         lambda1 = lambda epoch: 1 / (epoch + 1) #调整学习率
@@ -143,14 +145,12 @@ class Model():
                     loss_ = loss_.detach().cpu().numpy()
                     y     = y.detach().cpu().numpy()
                     train_l_sum += loss_
-                    sample.write("{:.3f}\n".format(  list(map(int,y_hat ) )    ))
-                    sample.write("{:.3f}\n\n".format(list (map(int,y         ))     ))
-                    sample.flush()
+                    self.sample_write(sample,y_hat,y)
                     train_err = sum([abs(y_hat[index] - y[index]) / (y[index]) for index in range(len(y_hat)) if y[index] != 0])/len(y_hat)
                     train_err_sum += train_err
                     n += y.shape[0]
                     batch_count += 1
-                    pbar.set_description("epoch:{},err={:.2f}".format(epoch,train_err))
+                    pbar.set_description("epoch:{},err:{:.2f},loss:{:.4f}".format(epoch,train_err,loss_))
                     pbar.update(1)
                     #end
                 self.scheduler.step() # 调整学习率
@@ -208,6 +208,18 @@ class Model():
         # plt.show()
         fig1.savefig(os.path.join(self.save_log_path,"fig1.png"))
         fig2.savefig(os.path.join(self.save_log_path,"fig2.png"))
+
+    
+    def sample_write(self,sample,y_hat,y,size = None):
+        '''向sample写入日志'''
+        size = size  if size and size < self.batch_size  else len(y_hat)
+        for i in range(size):
+            sample.write("{:.4f} ".format(y[i]))
+        sample.write("\n")
+        for i in range(size):
+            sample.write("{:<6} ".format(y_hat[i]))
+        sample.write("\n\n")
+        sample.flush()
 
 
 
