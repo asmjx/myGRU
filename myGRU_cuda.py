@@ -1,4 +1,3 @@
-import scipy.io as sio
 import numpy as np
 import torch
 from torch import nn
@@ -11,6 +10,7 @@ import torch.utils.data as Data
 from collections import OrderedDict
 import time
 import matplotlib.pyplot as plt
+import torch_directml
 # from config import args
 import os
 # Define GRU Neural Networks
@@ -212,12 +212,8 @@ class Model():
 
 
 if __name__ == '__main__':
-    torch.backends.cudnn.enabled=False
-    device = torch.device("cpu")
-    if torch.cuda.is_available():
-        device = torch.device("cuda")
-        print("use GPU")
-    else:
-        print("use CPU")
-    # process = Model(device= device)
-    # process.train()
+    # torch.backends.cudnn.enabled=False
+    device = torch_directml.device()
+    print("use device:{}".format(device))
+    process = Model(device= device)
+    process.train()
