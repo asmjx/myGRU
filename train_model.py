@@ -4,7 +4,7 @@ from torch import nn
 from tqdm import tqdm 
 import matplotlib.pyplot as plt
 import pandas as pd
-from data_phm import DataSet
+from from_main.data_phm import DataSet
 from torch.autograd import Variable
 import torch.utils.data as Data
 from collections import OrderedDict
@@ -14,11 +14,11 @@ from myGRU.from_main.myLSTM import LSTM
 import os
     
 class train():
-    def __init__(self,model,device = torch.device("cpu")):
-        self.epochs       = 200
-        self.batch_size   = 128
-        self.batches      = 30
-        self.lr           = 0.001
+    def __init__(self,model,device,args):
+        self.args = args
+        self.epoch = args.epoch
+        self.batch_size   = args.batch_size#128
+        self.lr           = args.lr       #0.001
         self.feature_size = 2
         self.device = device
         self.network      = model(self.feature_size).to(device)
@@ -44,11 +44,11 @@ class train():
     def train(self):
         dataset = DataSet.load_dataset("phm_data")
         train_iter = self.get_bear_data(dataset,'train')
-        # train_iter = self.get_bear_data(dataset,'test')
         test_iter =  self.get_bear_data(dataset,'test')
     
         with tqdm(total=self.epochs * len(train_iter),colour= "red") as pbar:
             for epoch in range(1,self.epochs+1):
+                #lr_setter(self.optimizer,epoch, args)
                 #训练的过程记录数据
                 train_l_sum, train_err_sum = 0.0, 0.0
                 batch_count ,test_loss ,test_err = 0,0,0

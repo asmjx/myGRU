@@ -76,7 +76,7 @@ class GRU_stable(nn.Module):
         out = torch.squeeze(out)                                          #out:[batch,1]
         return out,flatten_featuers
     
-def myGRU_with_table( input_size, num_layers=1,seq_len = 2560,args = None):
+def GRU_with_table( input_size, num_layers=1,seq_len = 2560,args = None):
     '''
     '''
     return GRU_stable( input_size, num_layers,seq_len,args)

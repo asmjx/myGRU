@@ -10,7 +10,7 @@ def weight_learner(cfeatures, pre_features, pre_weight1, args, global_epoch=0, i
     softmax = nn.Softmax(0)
     weight = Variable(torch.ones(cfeatures.size()[0], 1).cuda())# [batch , 1]
     weight.requires_grad = True
-    cfeaturec = Variable(torch.FloatTensor(cfeatures.size()).cuda()) #[batch,512 * 4] -> [128,512 * 4]
+    cfeaturec = Variable(torch.FloatTensor(cfeatures.size()).cuda()) #[batch,512] -> [128,512]
     cfeaturec.data.copy_(cfeatures.data)   
     all_feature = torch.cat([cfeaturec, pre_features.detach()], dim=0) #pre_features [n_feature,feature_dim] -> [128,512]
     optimizerbl = torch.optim.SGD([weight], lr=args.lrbl, momentum=0.9)

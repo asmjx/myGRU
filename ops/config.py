@@ -8,7 +8,7 @@ model_names = sorted(name for name in models.__dict__
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 
-parser.add_argument('-data', metavar='DIR', default='/DATA/DATANAS1/windxrz/dataset/PACS/split_compositional_with_val_sketch',
+parser.add_argument('-data', metavar='DIR', default='/root/Gear/Homework3-PACS/PACS/photo_process',
                     help='path to dataset')
 
 parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18_with_table',
@@ -43,7 +43,7 @@ parser.add_argument('--resume', default='', type=str, metavar='PATH',     # 从�
 
 parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
                     help='evaluate model on validation set')              # 在测试集上面评估模型
-parser.add_argument('--pretrained', default=True, type=bool, help='use pre-trained model') #预训练，大概不需要
+parser.add_argument('--pretrained', default=False, type=bool, help='use pre-trained model') #预训练，大概不需要
 parser.add_argument('--world-size', default=-1, type=int,
                     help='number of nodes for distributed training')      # 分布式训练？
 parser.add_argument('--rank', default=-1, type=int,               
@@ -54,7 +54,7 @@ parser.add_argument('--dist-backend', default='nccl', type=str,           # ?
                     help='distributed backend')
 parser.add_argument('--seed', default=3, type=int,                        # 初始化的随机种子，可能会影响结果
                     help='seed for initializing training. ')
-parser.add_argument('--gpu', default=None, type=int,                      # TODO:把这个都改成 todevice(args.gpu) ?
+parser.add_argument('--gpu', default=0, type=int,                      # TODO:把这个都改成 todevice(args.gpu) ?
                     help='GPU id to use.')
 parser.add_argument('--multiprocessing-distributed', action='store_true',
                     help='Use multi-processing distributed training to launch '
