@@ -13,11 +13,11 @@ from utilis.data_phm import DataSet
 def main():
     args = parser.parse_args()
 
-    if args.seed is not None:
-        random.seed(args.seed)
-        torch.manual_seed(args.seed)
-        torch.cuda.manual_seed_all(args.seed)
-        cudnn.deterministic = True
+    # if args.seed is not None:
+    #     random.seed(args.seed)
+    #     torch.manual_seed(args.seed)
+    #     torch.cuda.manual_seed_all(args.seed)
+    #     cudnn.deterministic = True
 
     main_worker(args)
 

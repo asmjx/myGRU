@@ -3,24 +3,24 @@ import torch
 from torch import nn
 from tqdm import tqdm 
 import matplotlib.pyplot as plt
-from utilis.data_phm import DataSet
+from data_phm import DataSet
 from torch.autograd import Variable
 import torch.utils.data as Data
 from collections import OrderedDict
 import matplotlib.pyplot as plt
-from training.reweighting import weight_learner
-from training.schedule import lr_setter
+from myLSTM import LSTM
+from ..models.myLSTM import LSTM_stable
 import os
     
-class Go_training():
-    def __init__(self,model,device,args):
-        self.args = args
-        self.epochs = args.epochs
-        self.batch_size   = args.batch_size#128
-        self.lr           = args.lr       #0.01
+class train():
+    def __init__(self,model,device = torch.device("cpu")):
+        self.epochs       = 200
+        self.batch_size   = 128
+        self.batches      = 30
+        self.lr           = 0.001
         self.feature_size = 2
         self.device = device
-        self.network      = model.to(device)
+        self.network      = model(self.feature_size).to(device)
         self.optimizer    =  torch.optim.Adam(self.network.parameters(),lr=self.lr,weight_decay=1e-4)
         # self.optimizer    =  torch.optim.SGD(self.network.parameters(),lr=self.lr,weight_decay=1e-4,momentum=0.78)
         # self.loss         = nn.CrossEntropyLoss()
@@ -43,65 +43,49 @@ class Go_training():
     def train(self):
         dataset = DataSet.load_dataset("phm_data")
         train_iter = self.get_bear_data(dataset,'train')
+        # train_iter = self.get_bear_data(dataset,'test')
         test_iter =  self.get_bear_data(dataset,'test')
     
         with tqdm(total=self.epochs * len(train_iter),colour= "red") as pbar:
-            for epoch in range(0,self.epochs):
-                lr_setter(self.optimizer,epoch, self.args)
-                tr_log = {"train_l_sum":0,"train_err_sum":0,"batch_count":0,"test_loss":0,"test_err":0}#训练的过程记录数据
+            for epoch in range(1,self.epochs+1):
+                #训练的过程记录数据
+                train_l_sum, train_err_sum = 0.0, 0.0
+                batch_count ,test_loss ,test_err = 0,0,0
+                #这里的无论是loss还是Err 都是一个batch数据的和
+                for x,y in train_iter:
+                    self.network.train()
+                    x = x.to(device)
+                    y = y.to(device)
+                    # x: [128, 2560, 2] :[batch,seq,feature]
+                    # y: [128]          :[batch:rul]
+                    y_hat,_ = self.network(x)
+                    # y_hat:[128]
+                    loss_ = self.loss(y_hat,y)
+                    self.optimizer.zero_grad()
+                    loss_.backward()
+                    self.optimizer.step()
 
-                self.fit(tr_log,train_iter,pbar,epoch)
+                    # 统计部分$$$$$$$$$$
+                    y_hat ,loss_ ,y= y_hat.detach().cpu().numpy(), loss_.detach().cpu().numpy(),y.detach().cpu().numpy()
+                    train_l_sum += loss_
+                    self.sample_write(self.sample,y_hat,y)
+                    train_err = sum([abs(y_hat[index] - y[index]) / (y[index]) for index in range(len(y_hat)) if y[index] != 0])/len(y_hat)
+                    train_err_sum += train_err
+                    batch_count += 1
+                    pbar.set_description("epoch:{},err:{:.2f},loss:{:.4f}".format(epoch,train_err,loss_))
+                    pbar.update(1)
+                    #end
+                # self.scheduler.step() # 调整学习率
+                test_err,test_loss = self.evaluate_accuracy(test_iter)#测试太慢了，暂时不进行测试
 
-                # tr_log["test_err"],tr_log["test_loss"] = self.evaluate_accuracy(test_iter)#测试太慢了，暂时不进行测试
-                epoch_info = f'epoch{epoch + 1}, train err:{tr_log["train_err_sum"]/tr_log["batch_count"] :.4f},\
-                        test err:{tr_log["test_err"]:.4f},train_loss:{tr_log["train_l_sum"] / tr_log["batch_count"]:.4f},test_loss:{tr_log["test_loss"]:.4f}\n'
+                #仍然是统计部分
+                epoch_info = f'epoch{epoch + 1}, train err:{train_err_sum/batch_count :.4f}, test err:{test_err:.4f},train_loss:{train_l_sum / batch_count:.4f},test_loss:{test_loss:.4f}\n'
                 print(epoch_info)
-                self.do_save_log(epoch_info,**tr_log)
+                self.do_save_log(epoch_info,train_err_sum,test_err,train_l_sum,test_loss,batch_count)
+
             #训练结束后保存图像
             self.paint(self.log)
             self.save_model() 
-
-    def fit(self,tr_log,train_iter,pbar,epoch):
-        self.network.train()
-        for i,(x,y) in enumerate(train_iter):
-            x = x.to(self.device)
-            y = y.to(self.device)
-            # x: [128, 2560, 2] :[batch,seq,feature]
-            # y: [128]          :[batch:rul]
-            y_hat,cfeatures = self.network(x) # y_hat:[128]  cfearture[B:hid][128,512]这里需要将hid 也改为和feature_dim相同
-            pre_features = self.network.pre_features # [n_feature,feature_dim] -> [128,512]
-            pre_weight1 = self.network.pre_weight1   # [n_feature,1] -> [128,1]
-
-            if epoch >= self.args.epochp:
-                weight1, pre_features, pre_weight1 = weight_learner(cfeatures, pre_features, pre_weight1, self.args, epoch, i)
-            else:
-                # weight1 [batch,1] ; cfeatures [batch,?]
-                weight1 = Variable(torch.ones(cfeatures.size()[0], 1).cuda())
-
-            self.network.pre_features.data.copy_(pre_features)
-            self.network.pre_weight1.data.copy_(pre_weight1)
-                        #[1*batch] @ [batch,1] = [1*1] -> variable
-            # loss_ = self.loss(y_hat, y).view(1, -1).mm(weight1).view(1)
-            loss_cpoy = self.loss(y_hat, y)
-            # print(weight1)
-            loss_ = self.weighted_mse_loss(y,y_hat,weight1)
-
-            self.optimizer.zero_grad()
-            loss_.backward()
-            self.optimizer.step()
-
-            # 统计部分$$$$$$$$$$
-            y_hat ,loss_ ,y= y_hat.detach().cpu().numpy(), loss_.detach().cpu().numpy(),y.detach().cpu().numpy()
-            tr_log["train_l_sum"] += loss_
-            self.sample_write(self.sample,y_hat,y)
-            train_err = sum([abs(y_hat[index] - y[index]) / (y[index]) for index in range(len(y_hat)) if y[index] != 0])/len(y_hat)
-            tr_log["train_err_sum"] += train_err
-            tr_log["batch_count"] += 1
-            pbar.set_description("epoch:{},err:{:.2f},loss:{:.4f}".format(epoch,train_err,loss_))
-            pbar.update(1)
-            #end
-        
-
 
     def get_bear_data(self, dataset, select):
         if select == 'train':
@@ -115,7 +99,7 @@ class Go_training():
             # _select = ['Bearing1_2','Bearing2_2','Bearing3_2']
         else:
             raise ValueError('wrong select!')
-        data,rul = dataset.get_data(_select,is_percent = True)
+        data,rul = dataset.get_data(_select,is_percent = False)
         # data :[测试总次数n,acc,2]
         # RUL  :[测试总次数n:RUL]
         data,rul = np.array(data),np.array(rul)
@@ -130,9 +114,6 @@ class Go_training():
         f1,f2 =  open(os.path.join(self.save_log_path,"train.log"),'w'), open(os.path.join(self.save_log_path,"sample.log"),'w') 
         f1.close()
         f2.close()
-
-    def weighted_mse_loss(self,input, target, weight):#计算MSE损失，并且实现加权
-        return (weight * (input - target) ** 2).mean()
 
     def do_save_log(self,epoch_info,train_err_sum,test_err,train_l_sum,test_loss,batch_count):
         '''保存一下log信息'''
@@ -201,3 +182,13 @@ class Go_training():
             sample.write("{:.4f} ".format(y_hat[i]))
         sample.write("\n\n")
         sample.flush()
+
+
+
+if __name__ == '__main__':
+    # torch.backends.cudnn.enabled=False
+    # device = torch_directml.device()
+    device = torch.device("cuda")
+    print("use device:{}".format(device))
+    train_example = train(device= device,model = LSTM_stable)
+    train_example.train()
