@@ -15,6 +15,10 @@ import pickle as pickle
 import numpy as np
 import pandas as pd
 from collections import OrderedDict
+from sklearn.preprocessing import MinMaxScaler
+#区间缩放，返回值为缩放到[0, 1]区间的数据
+data = ...
+# Standard_data=MinMaxScaler().fit_transform(data)
 
 class DataSet(object):
     def __init__(self,name ='phm_data',

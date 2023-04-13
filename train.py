@@ -12,7 +12,8 @@ import matplotlib.pyplot as plt
 from myGRU_cuda import GRU
 from myLSTM import LSTM
 import os
-    
+    #z-score
+    # 归一化min- max
 class train():
     def __init__(self,model,device = torch.device("cpu")):
         self.epochs       = 200
@@ -100,7 +101,7 @@ class train():
             # _select = ['Bearing1_2','Bearing2_2','Bearing3_2']
         else:
             raise ValueError('wrong select!')
-        data,rul = dataset.get_data(_select,is_percent = False)
+        data,rul = dataset.get_data(_select,is_percent = True)
         # data :[测试总次数n,acc,2]
         # RUL  :[测试总次数n:RUL]
         data,rul = np.array(data),np.array(rul)
@@ -191,5 +192,5 @@ if __name__ == '__main__':
     # device = torch_directml.device()
     device = torch.device("cuda")
     print("use device:{}".format(device))
-    train_example = train(device= device,model = LSTM)
+    train_example = train(device= device,model = GRU)
     train_example.train()
