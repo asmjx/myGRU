@@ -33,6 +33,7 @@ class DataSet(object):
                         'Bearing1_3':5730,'Bearing1_4':339,'Bearing1_5':1610,'Bearing1_6':1460,'Bearing1_7':7570,
                         'Bearing2_3':7530,'Bearing2_4':1390,'Bearing2_5':3090,'Bearing2_6':1290,'Bearing2_7':580,
                         'Bearing3_3':820}
+        self.total_time_RUL = {}                 #轴承的全部寿命长度 [bearname:str : RUL_p:float]
         #用来存储phm数据集的信息,字典:{bearName:[rul1,rul2....]}
         self.info    = {BearName:[] for BearName in self.RUL_dict} #为了方便后面能够给一个bearName和一个acc序列编号，可以方便的给出RUL
         self.make_data()
@@ -49,10 +50,12 @@ class DataSet(object):
                 total_acc_len = len(file_names)
                 with tqdm(total= total_acc_len,colour= "red") as pbar:
                     pbar.set_description(f"bear{bearings_name}")
+                    total_time = total_acc_len * self.each_acc  + self.RUL_dict[bearings_name] # 获得轴承总体寿命
+                    self.total_time_RUL[bearings_name] = total_time # 为这个轴承更新整体寿命
                     for acc_name in file_names:
                         if 'acc' in acc_name:
                             RUL = self._getRUL(bearings_name,acc_name,total_acc_len)
-                            # print(f"{bearings_name}:{acc_name}:{RUL}")
+                            # print(f"{bearings_name}:{acc_name}:{RUL}:{percentage_RUL}")
                             df = pd.read_csv(self.load_path  + path_1 + bearings_name + '/'\
                                             + acc_name,header=None)
                             acc = np.array(df.loc[:,4:6])
@@ -60,6 +63,7 @@ class DataSet(object):
                             self.info[bearings_name].append(RUL)  # 保存对应的每一个轴承RUL信息
                             self.dataset.append(append_item)
                         pbar.update(1)
+                    
         self.save()
 
 
@@ -78,11 +82,11 @@ class DataSet(object):
         RUL_time = self.RUL_dict[BearName]
         total_time = total_acc_len * self.each_acc  + RUL_time #轴承总寿命
         RUL = total_time - int(acc_name_substr) * self.each_acc  #
-
+        percentage_RUL = RUL / total_time                #剩余寿命百分比
         return RUL
 
 
-    def get_data(self,BearNames:list):
+    def get_data(self,BearNames:list,is_percent = False):
         '''返回对应轴承的所有数据
         input :['Bearing1_3','Bearing1_1']
         return:data:[acc:[2]],label:[rul:int]
@@ -92,8 +96,13 @@ class DataSet(object):
         for item in self.dataset:# item[0]:bearName,item[1]:data(acc),item[2]:label(rul)
             if item[0] in BearNames:
                 res_data.append(item[1])
-                res_label.append(item[2])
+                if is_percent: #如果要返回百分比的话
+                    res_label.append(item[2]/self.total_time_RUL[item[0]])
+                else:
+                    res_label.append(item[2])
         return res_data,res_label
+    
+    
 
 
     def shuffle(self):
@@ -128,6 +137,6 @@ class DataSet(object):
 
 
 if __name__ == '__main__':
-    # phm = DataSet()
+    phm = DataSet()
     dataset = DataSet.load_dataset('phm_data')
-    print('1')
+    print('Generated data_set')

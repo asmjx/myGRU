@@ -3,7 +3,7 @@ import torch
 from torch import nn
 from tqdm import tqdm 
 import matplotlib.pyplot as plt
-from from_main.data_phm import DataSet
+from utilis.data_phm import DataSet
 from torch.autograd import Variable
 import torch.utils.data as Data
 from collections import OrderedDict
@@ -12,15 +12,15 @@ from training.reweighting import weight_learner
 from training.schedule import lr_setter
 import os
     
-class train():
+class Go_training():
     def __init__(self,model,device,args):
         self.args = args
-        self.epoch = args.epoch
+        self.epochs = args.epochs
         self.batch_size   = args.batch_size#128
         self.lr           = args.lr       #0.001
         self.feature_size = 2
         self.device = device
-        self.network      = model(self.feature_size).to(device)
+        self.network      = model.to(device)
         self.optimizer    =  torch.optim.Adam(self.network.parameters(),lr=self.lr,weight_decay=1e-4)
         # self.optimizer    =  torch.optim.SGD(self.network.parameters(),lr=self.lr,weight_decay=1e-4,momentum=0.78)
         # self.loss         = nn.CrossEntropyLoss()

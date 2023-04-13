@@ -9,7 +9,7 @@ import torch.utils.data.distributed
 import models
 from ops.config import parser
 import train_model
-
+from utilis.data_phm import DataSet
 def main():
     args = parser.parse_args()
 
@@ -28,11 +28,11 @@ def main_worker(args):
 
     print("=> creating model '{}'".format(args.arch))
     model = models.__dict__[args.arch](args=args)
-    
+
 
     torch.cuda.set_device(args.gpu)
     model = model.cuda(args.gpu)
-    train_model_place = train_model(model,torch.device("cuda"),args)
+    train_model_place = train_model.Go_training(model,torch.device("cuda"),args)
     train_model_place.train()
 
 if __name__ == '__main__':

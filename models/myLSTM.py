@@ -3,11 +3,11 @@ import torch
 from torch import nn
 
 class LSTM_stable(nn.Module):
-    def __init__(self, feature_size,seq_len = 2560,args = None):
+    def __init__(self, input_size,seq_len = 2560,args = None):
         super(LSTM_stable,self).__init__()
         self.hidden_size = 256
         self.seq_len = seq_len
-        self.feature_size = feature_size
+        self.feature_size = input_size
         self.com = 10         # seq 放缩倍数
         bidirectional  = False
         if bidirectional:
@@ -17,13 +17,13 @@ class LSTM_stable(nn.Module):
         #序列太长了，训练太久了，需要进行压缩下
         # input x:[batch,seq,2] ->[batch,2 *seq] ->  [batch,seq/10 * 2] -> [batch,seq/10,2]
         self.compress_seq = nn.Sequential(
-            nn.Linear(self.seq_len * feature_size, int(self.seq_len / self.com)),
+            nn.Linear(self.seq_len * self.feature_size, int(self.seq_len / self.com)),
             nn.ReLU(),
-            nn.Linear( int(self.seq_len / self.com) , int(self.seq_len / self.com) * feature_size),
+            nn.Linear( int(self.seq_len / self.com) , int(self.seq_len / self.com) * self.feature_size),
         )
         # compress_seq: [batch,seq / 10 * feature_size]
         # reshape     : [batch,seq / 10 , feature_size]
-        self.net = nn.LSTM(feature_size , self.hidden_size,1,batch_first=True,bidirectional=bidirectional,dropout=0.3)
+        self.net = nn.LSTM(self.feature_size , self.hidden_size,1,batch_first=True,bidirectional=bidirectional,dropout=0.3)
         # h_n:[batch,hidden_size * dim_n]
         # out:[batch,seq,hidden_size * dim_n]
         # out.view:[batch*seq,hidden_size * dim_n]
@@ -74,7 +74,7 @@ class LSTM_stable(nn.Module):
         #[batch,1]
         return out,flatten_featuers
     
-def LSTM_with_table( input_size, num_layers=1,seq_len = 2560,args = None):
+def LSTM_with_table( input_size = 2,seq_len = 2560,args = None):
     '''
     '''
-    return LSTM_stable( input_size = 2, num_layers = num_layers,seq_len = seq_len,args = args)
+    return LSTM_stable( input_size = input_size,seq_len = seq_len,args = args)
