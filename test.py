@@ -1,5 +1,5 @@
-import models
-models.__dict__
-for item in models.__dict__:
-    print(item,models.__dict__[item])
-...
+a = {"qwe":1,"ert":1}
+def test(a):
+    a["qwe"] = 10
+test(a)  
+print(a)

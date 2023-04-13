@@ -11,7 +11,7 @@ parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 parser.add_argument('-data', metavar='DIR', default='/root/Gear/Homework3-PACS/PACS/photo_process',
                     help='path to dataset')
 
-parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18_with_table',
+parser.add_argument('-a', '--arch', metavar='ARCH', default='LSTM_with_table',
                     choices=model_names,
                     help='model architecture: ' +
                         ' | '.join(model_names) +
