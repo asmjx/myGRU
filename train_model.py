@@ -17,7 +17,7 @@ class Go_training():
         self.args = args
         self.epochs = args.epochs
         self.batch_size   = args.batch_size#128
-        self.lr           = args.lr       #0.001
+        self.lr           = args.lr       #0.01
         self.feature_size = 2
         self.device = device
         self.network      = model.to(device)
@@ -68,7 +68,7 @@ class Go_training():
             y = y.to(self.device)
             # x: [128, 2560, 2] :[batch,seq,feature]
             # y: [128]          :[batch:rul]
-            y_hat,cfeatures = self.network(x) # y_hat:[128]  cfearture[B:hid]
+            y_hat,cfeatures = self.network(x) # y_hat:[128]  cfearture[B:hid][128,512]这里需要将hid 也改为和feature_dim相同
             pre_features = self.network.pre_features # [n_feature,feature_dim] -> [128,512]
             pre_weight1 = self.network.pre_weight1   # [n_feature,1] -> [128,1]
 
@@ -81,7 +81,9 @@ class Go_training():
             self.network.pre_features.data.copy_(pre_features)
             self.network.pre_weight1.data.copy_(pre_weight1)
                         #[1*batch] @ [batch,1] = [1*1] -> variable
-            loss_ = self.loss(y_hat, y).view(1, -1).mm(weight1).view(1)
+            # loss_ = self.loss(y_hat, y).view(1, -1).mm(weight1).view(1)
+            loss_cpoy = self.loss(y_hat, y)
+            loss_ = self.weighted_mse_loss(y,y_hat,weight1)
 
             self.optimizer.zero_grad()
             loss_.backward()
@@ -91,10 +93,10 @@ class Go_training():
             y_hat ,loss_ ,y= y_hat.detach().cpu().numpy(), loss_.detach().cpu().numpy(),y.detach().cpu().numpy()
             tr_log["train_l_sum"] += loss_
             self.sample_write(self.sample,y_hat,y)
-            tr_log["train_err"] = sum([abs(y_hat[index] - y[index]) / (y[index]) for index in range(len(y_hat)) if y[index] != 0])/len(y_hat)
-            tr_log["train_err_sum"] += tr_log["train_err"]
+            train_err = sum([abs(y_hat[index] - y[index]) / (y[index]) for index in range(len(y_hat)) if y[index] != 0])/len(y_hat)
+            tr_log["train_err_sum"] += train_err
             tr_log["batch_count"] += 1
-            pbar.set_description("epoch:{},err:{:.2f},loss:{:.4f}".format(epoch,tr_log["train_err"],loss_))
+            pbar.set_description("epoch:{},err:{:.2f},loss:{:.4f}".format(epoch,train_err,loss_))
             pbar.update(1)
             #end
         
@@ -112,7 +114,7 @@ class Go_training():
             # _select = ['Bearing1_2','Bearing2_2','Bearing3_2']
         else:
             raise ValueError('wrong select!')
-        data,rul = dataset.get_data(_select,is_percent = False)
+        data,rul = dataset.get_data(_select,is_percent = True)
         # data :[测试总次数n,acc,2]
         # RUL  :[测试总次数n:RUL]
         data,rul = np.array(data),np.array(rul)
@@ -127,6 +129,9 @@ class Go_training():
         f1,f2 =  open(os.path.join(self.save_log_path,"train.log"),'w'), open(os.path.join(self.save_log_path,"sample.log"),'w') 
         f1.close()
         f2.close()
+
+    def weighted_mse_loss(self,input, target, weight):#计算MSE损失，并且实现加权
+        return (weight * (input - target) ** 2).mean()
 
     def do_save_log(self,epoch_info,train_err_sum,test_err,train_l_sum,test_loss,batch_count):
         '''保存一下log信息'''
@@ -155,7 +160,7 @@ class Go_training():
                 y = y.to(self.device)
 
                 net.eval()  # 评估模式, 这会关闭dropout
-                y_hat = net(x).to(self.device)
+                y_hat,_ = net(x)
                 loss = self.loss(y_hat,y)
                 net.train()  # 改回训练模式
 

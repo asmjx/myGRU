@@ -1,4 +1,4 @@
-import loss_reweighting as loss_expect
+import training.loss_reweighting as loss_expect
 import torch
 import torch.nn as nn
 from torch.autograd import Variable

@@ -5,7 +5,8 @@ from torch import nn
 class LSTM_stable(nn.Module):
     def __init__(self, input_size,seq_len = 2560,args = None):
         super(LSTM_stable,self).__init__()
-        self.hidden_size = 256
+        self.hidden_size = 512 #这是一个需要特别注意的参数，因为 flatten_featuers [B,hid_size]需要和c_feature的size一样才行
+                                #cfeature 的size 在config文件里面定义了[n_feature,feature_dim]->[128,512]参见本文件【42】行
         self.seq_len = seq_len
         self.feature_size = input_size
         self.com = 10         # seq 放缩倍数
