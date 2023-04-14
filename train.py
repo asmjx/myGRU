@@ -20,7 +20,8 @@ class train():
         self.batch_size   = 128
         self.batches      = 30
         self.lr           = 0.001
-        self.feature_size = 2
+        self.data_set_Name = "phm_data_Z5"
+        self.feature_size = 1
         self.device = device
         self.network      = model(self.feature_size).to(device)
         self.optimizer    =  torch.optim.Adam(self.network.parameters(),lr=self.lr,weight_decay=1e-4)
@@ -40,10 +41,11 @@ class train():
         self.log['test_loss'] = []
         # sample<记录每一次的预测结果的文件>
         self.sample = open(os.path.join(self.save_log_path,"sample.log"),"w",encoding="utf-8") 
+        self.sample_test = open(os.path.join(self.save_log_path,"sample_test.log"),"w",encoding="utf-8") 
         self.initLogF()
 
     def train(self):
-        dataset = DataSet.load_dataset("phm_data")
+        dataset = DataSet.load_dataset(self.data_set_Name)
         train_iter = self.get_bear_data(dataset,'train')
         # train_iter = self.get_bear_data(dataset,'test')
         test_iter =  self.get_bear_data(dataset,'test')
@@ -70,7 +72,7 @@ class train():
                     # 统计部分$$$$$$$$$$
                     y_hat ,loss_ ,y= y_hat.detach().cpu().numpy(), loss_.detach().cpu().numpy(),y.detach().cpu().numpy()
                     train_l_sum += loss_
-                    self.sample_write(self.sample,y_hat,y)
+                    self.sample_write(self.sample,y_hat,y,size = 30)
                     train_err = sum([abs(y_hat[index] - y[index]) / (y[index]) for index in range(len(y_hat)) if y[index] != 0])/len(y_hat)
                     train_err_sum += train_err
                     batch_count += 1
@@ -107,7 +109,7 @@ class train():
         data,rul = np.array(data),np.array(rul)
         data,rul = torch.tensor(data),torch.tensor(rul).float()
         data_set = Data.TensorDataset(data,rul)
-        output   =   Data.DataLoader(data_set,self.batch_size,shuffle = True)
+        output   =   Data.DataLoader(data_set,self.batch_size,shuffle = False)
         return output
 
     def initLogF(self):#用来初始化存放log的文件夹
@@ -151,6 +153,7 @@ class train():
                 test_loss_sum += loss.cpu().item()
                 y_hat = y_hat.detach().cpu().numpy()
                 y     = y.detach().cpu().numpy()
+                self.sample_write(self.sample_test,y_hat,y,20)
                 test_err = sum([abs(y_hat[index] - y[index]) / (y[index]) for index in range(len(y_hat)) if y[index] != 0])/len(y_hat)
                 test_err_sum += test_err
                 batch_count += 1
@@ -176,7 +179,7 @@ class train():
     
     def sample_write(self,sample,y_hat,y,size = None):
         '''向sample写入日志'''
-        size = size  if size and size < self.batch_size  else len(y_hat)
+        size = size  if size and size <= len(y_hat)  else len(y_hat)
         for i in range(size):
             sample.write("{:.4f} ".format(y[i]))
         sample.write("\n")
