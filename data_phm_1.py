@@ -35,6 +35,7 @@ class DataSet(object):
         self.save_path = save_path #将自身保存为.pkl文件，以便于后面继续调用
         self.load_path = load_path #加载数据集
         self.normalize = normalize
+        self.feature_dim = 5
         self.each_acc  = 10        #每一个振动序列的时间 s
         self.RUL_dict = {'Bearing1_1':0,'Bearing1_2':0,
                         'Bearing2_1':0,'Bearing2_2':0,
@@ -70,15 +71,16 @@ class DataSet(object):
                             # print(f"{bearings_name}:{acc_name}:{RUL}:{percentage_RUL}")
                             df = pd.read_csv(self.load_path  + path_1 + bearings_name + '/'\
                                             + acc_name,header=None)
-                            acc = np.array(df.loc[:,4:6])
+                            acc = np.array(df.loc[:,self.feature_dim]) # 这里只用第5维度作为震动信号
                             if acc.shape[0] != 2560:
                                 print(acc.shape[0])
                             bear_all_accs = np.concatenate((bear_all_accs,acc),axis = 0) if i != 0 else acc
                         pbar.update(1)
+                    bear_all_accs = bear_all_accs.reshape(-1,1)
                     bear_all_accs_z_score = preprocessing.scale(bear_all_accs)
                     bear_all_accs_min_max = preprocessing.MinMaxScaler().fit_transform(bear_all_accs)
-                    bear_all_accs_z_score = bear_all_accs_z_score.reshape(total_acc_len,2560,2)
-                    bear_all_accs_min_max = bear_all_accs_min_max.reshape(total_acc_len,2560,2)
+                    bear_all_accs_z_score = bear_all_accs_z_score.reshape(total_acc_len,2560)
+                    bear_all_accs_min_max = bear_all_accs_min_max.reshape(total_acc_len,2560)
 
                     for i in range(total_acc_len):
                         acc_process = ...
@@ -154,8 +156,9 @@ class DataSet(object):
             ap_str += "Z" #z
         else:
             ap_str += "M" #Min - Max
+        ap_str += str(self.feature_dim)
         pickle.dump(self, open(self.save_path + 'DataSet_' +
-                                        self.name + '.pkl', 'wb'), True)
+                                        self.name + ap_str + '.pkl', 'wb'), True)
         print('dataset ', self.name, ' has benn saved\n')
 
 
@@ -179,7 +182,7 @@ class DataSet(object):
 #带M的是最大最小
 #不带的是z
 if __name__ == '__main__':
-    # phm = DataSet(name= 'phm_data')
+    phm = DataSet(name= 'phm_data')
     dataset = DataSet.load_dataset('phm_data')
     dataset.paint_acc_random()
     print('Generated data_set')
