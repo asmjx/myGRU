@@ -1,5 +1,5 @@
-a = {"qwe":1,"ert":1}
-def test(a):
-    a["qwe"] = 10
-test(a)  
-print(a)
+import datetime
+today = datetime.datetime.today()#today = datetime.datetime.today()
+year = today.year#2022
+month = today.month#4
+print(str(today))

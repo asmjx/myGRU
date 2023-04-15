@@ -22,13 +22,13 @@ class GRU_stable(nn.Module):
         - num_layers: layers of LSTM to stack
     """
 
-    def __init__(self, input_size, num_layers=1,seq_len = 2560,args = None):
+    def __init__(self, num_layers=1,seq_len = 2560,args = None):
         super().__init__()
         self.hidden_size = 256
         self.seq_len = seq_len
-        self.feature_size = input_size
+        self.feature_size = args.feature_size
         bidirectional  = False # 是否是双向网络
-        self.com = 10         # seq 放缩倍数
+        self.com = 40         # seq 放缩倍数
         if bidirectional:
             self.dim_n = 2
         else:
@@ -39,11 +39,11 @@ class GRU_stable(nn.Module):
             nn.ReLU(),
             nn.Linear( int(self.seq_len / self.com) , int(self.seq_len / self.com) * self.feature_size),
         )
-        self.net = nn.GRU(input_size, self.hidden_size, batch_first=True,num_layers = 1,bidirectional = bidirectional)  # utilize the GRU model in torch.nn
+        self.net = nn.GRU(self.feature_size, self.hidden_size, batch_first=True,num_layers = 1,bidirectional = bidirectional)  # utilize the GRU model in torch.nn
         self.FC = nn.Sequential(
             nn.Linear(self.hidden_size * self.dim_n,256),
             nn.ReLU(),
-            nn.Dropout(0.5),
+            nn.Dropout(0.2),
             nn.Linear(256,1),
             # nn.BatchNorm2d(1),
             nn.ReLU()                        #此处的问题，为什么添加了ReLU或者其他的激活函数作为输出后，预测的结果之间全是0(tanh为负数)
@@ -76,10 +76,10 @@ class GRU_stable(nn.Module):
         out = torch.squeeze(out)                                          #out:[batch,1]
         return out,flatten_featuers
     
-def GRU_with_table( input_size, num_layers=1,seq_len = 2560,args = None):
+def GRU_with_table( num_layers=1,seq_len = 2560,args = None):
     '''
     '''
-    return GRU_stable( input_size, num_layers,seq_len,args)
+    return GRU_stable(num_layers,seq_len,args)
 
 
 

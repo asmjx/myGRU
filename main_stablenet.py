@@ -32,7 +32,7 @@ def main_worker(args):
 
     torch.cuda.set_device(args.gpu)
     model = model.cuda(args.gpu)
-    train_model_place = train_model.Go_training(model,torch.device("cuda"),args)
+    train_model_place = train_model.Go_training(model,torch.device("cuda"),args,feature_size = 1) 
     train_model_place.train()
 
 if __name__ == '__main__':

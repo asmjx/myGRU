@@ -11,14 +11,15 @@ import matplotlib.pyplot as plt
 from training.reweighting import weight_learner
 from training.schedule import lr_setter
 import os
-    
+import datetime
+
 class Go_training():
-    def __init__(self,model,device,args):
+    def __init__(self,model,device,args,feature_size = 2):
         self.args = args
         self.epochs = args.epochs
         self.batch_size   = args.batch_size#128
         self.lr           = args.lr       #0.01
-        self.feature_size = 2
+        self.feature_size = feature_size
         self.device = device
         self.network      = model.to(device)
         self.optimizer    =  torch.optim.Adam(self.network.parameters(),lr=self.lr,weight_decay=1e-4)
@@ -26,6 +27,7 @@ class Go_training():
         # self.loss         = nn.CrossEntropyLoss()
         self.loss         = nn.MSELoss()
         self.save_log_path = "./log"
+        self.data_set_name = ""
         # self.loss         = nn.KLDivLoss(reduction='batchmean') # KL 散度可用于衡量不同的连续分布之间的距离, 在连续的输出分布的空间上(离散采样)上进行直接回归时
         # lambda1 = lambda epoch: 1 / (epoch + 1) #调整学习率
         # self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=[lambda1])
@@ -38,10 +40,13 @@ class Go_training():
         self.log['test_loss'] = []
         # sample<记录每一次的预测结果的文件>
         self.sample = open(os.path.join(self.save_log_path,"sample.log"),"w",encoding="utf-8") 
+        self.sample_test = open(os.path.join(self.save_log_path,"sample_test.log"),"w",encoding="utf-8") 
+        self.sample_weight = open(os.path.join(self.save_log_path,"sample_weight.log"),"w",encoding="utf-8") 
         self.initLogF()
 
     def train(self):
-        dataset = DataSet.load_dataset("phm_data")
+        self.data_set_name = "phm_data_Z5"
+        dataset = DataSet.load_dataset(self.data_set_name)
         train_iter = self.get_bear_data(dataset,'train')
         test_iter =  self.get_bear_data(dataset,'test')
     
@@ -52,7 +57,7 @@ class Go_training():
 
                 self.fit(tr_log,train_iter,pbar,epoch)
 
-                # tr_log["test_err"],tr_log["test_loss"] = self.evaluate_accuracy(test_iter)#测试太慢了，暂时不进行测试
+                tr_log["test_err"],tr_log["test_loss"] = self.evaluate_accuracy(test_iter)#测试太慢了，暂时不进行测试
                 epoch_info = f'epoch{epoch + 1}, train err:{tr_log["train_err_sum"]/tr_log["batch_count"] :.4f},\
                         test err:{tr_log["test_err"]:.4f},train_loss:{tr_log["train_l_sum"] / tr_log["batch_count"]:.4f},test_loss:{tr_log["test_loss"]:.4f}\n'
                 print(epoch_info)
@@ -84,6 +89,7 @@ class Go_training():
             # loss_ = self.loss(y_hat, y).view(1, -1).mm(weight1).view(1)
             loss_cpoy = self.loss(y_hat, y)
             # print(weight1)
+            self.sample_weight.write(",".join(list(map (str,weight1.detach().cpu().numpy())) ))
             loss_ = self.weighted_mse_loss(y,y_hat,weight1)
 
             self.optimizer.zero_grad()
@@ -93,7 +99,7 @@ class Go_training():
             # 统计部分$$$$$$$$$$
             y_hat ,loss_ ,y= y_hat.detach().cpu().numpy(), loss_.detach().cpu().numpy(),y.detach().cpu().numpy()
             tr_log["train_l_sum"] += loss_
-            self.sample_write(self.sample,y_hat,y)
+            self.sample_write(self.sample,y_hat,y,size = 30)
             train_err = sum([abs(y_hat[index] - y[index]) / (y[index]) for index in range(len(y_hat)) if y[index] != 0])/len(y_hat)
             tr_log["train_err_sum"] += train_err
             tr_log["batch_count"] += 1
@@ -106,6 +112,7 @@ class Go_training():
     def get_bear_data(self, dataset, select):
         if select == 'train':
             _select = ['Bearing1_1','Bearing1_2','Bearing2_1','Bearing2_2','Bearing3_1','Bearing3_2']
+            _select += ['Bearing1_3','Bearing1_4','Bearing1_5','Bearing1_6']
             # _select =['Bearing1_3','Bearing1_1']
             # _select =['Bearing1_1']
         elif select == 'test':
@@ -140,9 +147,17 @@ class Go_training():
         self.log['test_err'].append(test_err)
         self.log['train_loss'].append(train_l_sum/batch_count)
         self.log['test_loss'].append(test_loss)
+        now_time = datetime.datetime.today()
+        self.save_log_path += str(now_time)
+        if not os.path.exists(self.save_log_path):
+            os.makedirs(self.save_log_path)
         f = open(os.path.join(self.save_log_path,"train.log"), 'a',encoding="utf-8")
         f.write(epoch_info + "\n")
         f.close()
+        f_args = open(os.path.join(self.save_log_path,"train.log"), 'a',encoding="utf-8")
+        f.write(f"epochs:{self.epochs}\nbatch_size:{self.batch_size}\n\
+                lr:{self.lr}\nDataSet:{self.data_set_name}\n\
+                network:{self.args.arch}\n")
     
     def save_model(self):
         "保存模型"
@@ -168,6 +183,7 @@ class Go_training():
                 test_loss_sum += loss.cpu().item()
                 y_hat = y_hat.detach().cpu().numpy()
                 y     = y.detach().cpu().numpy()
+                self.sample_write(self.sample_test,y_hat,y,size = 30)
                 test_err = sum([abs(y_hat[index] - y[index]) / (y[index]) for index in range(len(y_hat)) if y[index] != 0])/len(y_hat)
                 test_err_sum += test_err
                 batch_count += 1
@@ -193,7 +209,7 @@ class Go_training():
     
     def sample_write(self,sample,y_hat,y,size = None):
         '''向sample写入日志'''
-        size = size  if size and size < self.batch_size  else len(y_hat)
+        size = size  if size and size < len(y_hat)  else len(y_hat)
         for i in range(size):
             sample.write("{:.4f} ".format(y[i]))
         sample.write("\n")

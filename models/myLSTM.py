@@ -3,12 +3,12 @@ import torch
 from torch import nn
 
 class LSTM_stable(nn.Module):
-    def __init__(self, input_size,seq_len = 2560,args = None):
+    def __init__(self,seq_len = 2560,args = None):
         super(LSTM_stable,self).__init__()
         self.hidden_size = args.feature_dim #这是一个需要特别注意的参数，因为 flatten_featuers [B,hid_size]需要和c_feature的size一样才行
                                 #cfeature 的size 在config文件里面定义了[n_feature,feature_dim]->[128,512]参见本文件【42】行
         self.seq_len = seq_len
-        self.feature_size = input_size
+        self.feature_size = args.feature_size
         self.com = 10         # seq 放缩倍数
         bidirectional  = False
         if bidirectional:
@@ -32,7 +32,7 @@ class LSTM_stable(nn.Module):
         self.FC = nn.Sequential(
             nn.Linear(self.hidden_size * self.dim_n,256),
             nn.ReLU(),
-            nn.Dropout(0.5),
+            nn.Dropout(0.2),
             nn.Linear(256,1),
             nn.LeakyReLU(),
         )
@@ -62,7 +62,7 @@ class LSTM_stable(nn.Module):
         # input x:[batch,seq,2] ->[batch,2 *seq] ->  [batch,seq/10 * 2] -> [batch,seq/10,2]
         x = x.reshape(-1, self.seq_len * self.feature_size)
         x_com = self.compress_seq(x) # [batch,seq/10 * 2]
-        x_com = x_com.reshape(-1,int(self.seq_len / 10),self.feature_size)
+        x_com = x_com.reshape(-1,int(self.seq_len / self.com),self.feature_size)
         #压缩结束[batch,seq/10,2]
         output,(h,c) = self.net(x_com)
         # h :[1,128,256],[1,batch,hidden_size]
@@ -75,7 +75,7 @@ class LSTM_stable(nn.Module):
         #[batch,1]
         return out,flatten_featuers
     
-def LSTM_with_table( input_size = 2,seq_len = 2560,args = None):
+def LSTM_with_table( seq_len = 2560,args = None):
     '''
     '''
-    return LSTM_stable( input_size = input_size,seq_len = seq_len,args = args)
+    return LSTM_stable( seq_len = seq_len,args = args)

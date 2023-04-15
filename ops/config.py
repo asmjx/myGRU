@@ -18,7 +18,9 @@ parser.add_argument('-a', '--arch', metavar='ARCH', default='LSTM_with_table',
                         ' (default: resnet18)') ##################这个模型结构应该需要更改
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
-parser.add_argument('--epochs', default=200, type=int, metavar='N',
+parser.add_argument('-ff', '--feature_size', default=1, type=int, metavar='N',
+                    help='网络输入的特征大小')
+parser.add_argument('--epochs', default=100, type=int, metavar='N',
                     help='number of total epochs to run') #####################epochs
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')#####start_epochs
@@ -27,7 +29,7 @@ parser.add_argument('-b', '--batch-size', default=128, type=int,    #batchsize
                     help='mini-batch size (default: 256), this is the total '
                          'batch size of all GPUs on the current node when '
                          'using Data Parallel or Distributed Data Parallel')
-parser.add_argument('--lr', '--learning-rate', default=0.01, type=float,
+parser.add_argument('--lr', '--learning-rate', default=0.001, type=float,
                     metavar='LR', help='initial learning rate', dest='lr')# 学习率部分，应该会有学习率下降
 parser.add_argument('--cos', '--cosine_lr', default=1, type=int,
                     metavar='COS', help='lr decay by decay', dest='cos')  # 学习率衰减的一个选项
@@ -56,15 +58,7 @@ parser.add_argument('--seed', default=0, type=int,                        # 初�
                     help='seed for initializing training. ')
 parser.add_argument('--gpu', default=0, type=int,                      # TODO:把这个都改成 todevice(args.gpu) ?
                     help='GPU id to use.')
-parser.add_argument('--multiprocessing-distributed', action='store_true',
-                    help='Use multi-processing distributed training to launch '
-                         'N processes per node, which has N GPUs. This is the '
-                         'fastest way to use PyTorch for either single node or '
-                         'multi node data parallel training')
 
-parser.add_argument('--log_base',
-                    default='./results', type=str, metavar='PATH',
-                    help='path to save logs (default: none)')    
 
 # for number of fourier spaces
 parser.add_argument ('--num_f', type=int, default=1, help = 'number of fourier spaces')
