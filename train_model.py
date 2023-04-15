@@ -27,11 +27,13 @@ class Go_training():
         # self.loss         = nn.CrossEntropyLoss()
         self.loss         = nn.MSELoss()
         self.save_log_path = "./log"
+        now_time = datetime.datetime.today()
+        self.save_log_path += str(now_time)
+        self.initLogF()
         self.data_set_name = ""
         # self.loss         = nn.KLDivLoss(reduction='batchmean') # KL 散度可用于衡量不同的连续分布之间的距离, 在连续的输出分布的空间上(离散采样)上进行直接回归时
         # lambda1 = lambda epoch: 1 / (epoch + 1) #调整学习率
         # self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=[lambda1])
-
         # 统计部分
         self.log = OrderedDict()
         self.log['train_err'] = []
@@ -42,7 +44,7 @@ class Go_training():
         self.sample = open(os.path.join(self.save_log_path,"sample.log"),"w",encoding="utf-8") 
         self.sample_test = open(os.path.join(self.save_log_path,"sample_test.log"),"w",encoding="utf-8") 
         self.sample_weight = open(os.path.join(self.save_log_path,"sample_weight.log"),"w",encoding="utf-8") 
-        self.initLogF()
+        
 
     def train(self):
         self.data_set_name = "phm_data_Z5"
@@ -63,6 +65,7 @@ class Go_training():
                 print(epoch_info)
                 self.do_save_log(epoch_info,**tr_log)
             #训练结束后保存图像
+            self.do_save_args()
             self.paint(self.log)
             self.save_model() 
 
@@ -82,7 +85,9 @@ class Go_training():
             else:
                 # weight1 [batch,1] ; cfeatures [batch,?]
                 weight1 = Variable(torch.ones(cfeatures.size()[0], 1).cuda())
-
+            if self.args.arch == "LSTM_LTS":#如果是使用特征加权的方式
+                y_hat = self.network.get_origin_res(cfeatures,weight1)
+                
             self.network.pre_features.data.copy_(pre_features)
             self.network.pre_weight1.data.copy_(pre_weight1)
                         #[1*batch] @ [batch,1] = [1*1] -> variable
@@ -113,8 +118,7 @@ class Go_training():
         if select == 'train':
             _select = ['Bearing1_1','Bearing1_2','Bearing2_1','Bearing2_2','Bearing3_1','Bearing3_2']
             _select += ['Bearing1_3','Bearing1_4','Bearing1_5','Bearing1_6']
-            # _select =['Bearing1_3','Bearing1_1']
-            # _select =['Bearing1_1']
+            # _select += ['Bearing1_3','Bearing1_4']
         elif select == 'test':
             _select = ['Bearing1_3','Bearing1_4','Bearing1_5','Bearing1_6','Bearing1_7',
                         'Bearing2_3','Bearing2_4','Bearing2_5','Bearing2_6','Bearing2_7',
@@ -133,7 +137,7 @@ class Go_training():
 
     def initLogF(self):#用来初始化存放log的文件夹
         if  not os.path.exists(self.save_log_path):
-            os.mkdir(self.save_log_path)
+            os.makedirs(self.save_log_path)
         f1,f2 =  open(os.path.join(self.save_log_path,"train.log"),'w'), open(os.path.join(self.save_log_path,"sample.log"),'w') 
         f1.close()
         f2.close()
@@ -147,17 +151,19 @@ class Go_training():
         self.log['test_err'].append(test_err)
         self.log['train_loss'].append(train_l_sum/batch_count)
         self.log['test_loss'].append(test_loss)
-        now_time = datetime.datetime.today()
-        self.save_log_path += str(now_time)
         if not os.path.exists(self.save_log_path):
             os.makedirs(self.save_log_path)
         f = open(os.path.join(self.save_log_path,"train.log"), 'a',encoding="utf-8")
         f.write(epoch_info + "\n")
         f.close()
-        f_args = open(os.path.join(self.save_log_path,"train.log"), 'a',encoding="utf-8")
-        f.write(f"epochs:{self.epochs}\nbatch_size:{self.batch_size}\n\
-                lr:{self.lr}\nDataSet:{self.data_set_name}\n\
-                network:{self.args.arch}\n")
+
+    def do_save_args(self):
+        '''保存模型的参数信息'''
+        f_args = open(os.path.join(self.save_log_path,"args.log"), 'a',encoding="utf-8")
+        f_args.write(f'''epochs:{self.epochs}\nbatch_size:{self.batch_size}\n
+                lr:{self.lr}\nDataSet:{self.data_set_name}\n
+                network:{self.args.arch}\n''')
+        f_args.close()
     
     def save_model(self):
         "保存模型"
@@ -176,7 +182,10 @@ class Go_training():
                 y = y.to(self.device)
 
                 net.eval()  # 评估模式, 这会关闭dropout
-                y_hat,_ = net(x)
+                y_hat,cfeatures = net(x)
+                weight1 = Variable(torch.ones(cfeatures.size()[0], 1).cuda())
+                if self.args.arch == "LSTM_LTS":#如果是使用特征加权的方式
+                    y_hat = self.network.get_origin_res(cfeatures,weight1)
                 loss = self.loss(y_hat,y)
                 net.train()  # 改回训练模式
 

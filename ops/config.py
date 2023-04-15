@@ -11,7 +11,7 @@ parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 parser.add_argument('-data', metavar='DIR', default='/root/Gear/Homework3-PACS/PACS/photo_process',
                     help='path to dataset')
 
-parser.add_argument('-a', '--arch', metavar='ARCH', default='LSTM_with_table',
+parser.add_argument('-a', '--arch', metavar='ARCH', default='LSTM_with_table',#GRU_with_table,LSTM_with_table,LSTM_LTS
                     choices=model_names,
                     help='model architecture: ' +
                         ' | '.join(model_names) +
@@ -71,7 +71,7 @@ parser.add_argument ('--lambdap', type = float, default = 70.0, help = 'weight d
 parser.add_argument ('--lambdapre', type = float, default = 1, help = 'weight for pre_weight1 ')# No USE
 
 parser.add_argument ('--epochb', type = int, default = 20, help = 'number of epochs to balance') # 由当前权重值求得下一次权重值和的epoch
-parser.add_argument ('--epochp', type = int, default = 200, help = 'number of epochs to pretrain')
+parser.add_argument ('--epochp', type = int, default = 0, help = 'number of epochs to pretrain')
 
 parser.add_argument ('--n_feature', type=int, default=128, help = 'number of pre-saved features')# 这里必须注意 n_feature应该需要和batch_size相同吧？？？
 parser.add_argument ('--feature_dim', type=int, default=256, help = 'the dim of each feature')
